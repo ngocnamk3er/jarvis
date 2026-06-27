@@ -4,6 +4,8 @@ import { useState } from "react"
 import { ChevronDown, ChevronRight, Loader2, Wrench } from "lucide-react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { ToolCall } from "@/types/chat"
 
 const LANG_MAP: Record<string, string> = {
@@ -65,9 +67,16 @@ function OutputBlock({ output }: { output: string }) {
   return (
     <div>
       <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">output</span>
-      <pre className="bg-[#F0F4FF] text-gray-700 rounded-xl px-4 py-3 text-[12px] font-mono overflow-x-auto whitespace-pre-wrap leading-[18px] border border-[#E0E7FF]">
-        {text}
-      </pre>
+      <div className="bg-[#F0F4FF] rounded-xl px-4 py-3 border border-[#E0E7FF] text-[12px] leading-[18px] text-gray-700
+        [&_p]:mb-2 [&_p:last-child]:mb-0
+        [&_strong]:font-semibold [&_strong]:text-gray-800
+        [&_a]:text-[#5661f6] [&_a]:underline [&_a]:break-all
+        [&_ul]:pl-4 [&_ul]:my-1 [&_li]:my-0.5
+        [&_hr]:border-[#E0E7FF] [&_hr]:my-2">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {text}
+        </ReactMarkdown>
+      </div>
     </div>
   )
 }

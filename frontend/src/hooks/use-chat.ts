@@ -39,11 +39,11 @@ export function useChat(threadId: string | null) {
 
   const loadHistory = useCallback(async (id: string) => {
     const res = await fetch(`${API_URL}/api/v1/conversations/${id}/messages`)
-    const data: { role: string; content: string }[] = await res.json()
+    const data: { role: string; parts: MessagePart[] }[] = await res.json()
     const loaded: Message[] = data.map((m) => ({
       id: makeId(),
       role: m.role as "user" | "assistant",
-      parts: [{ type: "text" as const, content: m.content }],
+      parts: m.parts,
       isStreaming: false,
     }))
     setMessages(loaded)

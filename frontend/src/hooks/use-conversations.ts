@@ -13,8 +13,11 @@ export function useConversations() {
     setLoading(true)
     try {
       const res = await fetch(`${API_URL}/api/v1/conversations`)
-      const data = await res.json()
-      setConversations(data)
+      if (!res.ok) return
+      const data: Conversation[] = await res.json()
+      setConversations(Array.isArray(data) ? data : [])
+    } catch {
+      // backend unavailable — leave list empty
     } finally {
       setLoading(false)
     }
@@ -26,8 +29,13 @@ export function useConversations() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title }),
     })
-    const conv = await res.json()
-    setConversations((prev) => [conv, ...prev])
+    if (!res.ok) throw new Error(`Failed to create conversation: ${res.status}`)
+    const conv: Conversation = await res.json()
+    if (!conv?.id) throw new Error("Invalid conversation response")
+    setConversations((prev) => {
+      const safe = Array.isArray(prev) ? prev : []
+      return [conv, ...safe.filter((c) => c.id !== conv.id)]
+    })
     return conv
   }, [])
 

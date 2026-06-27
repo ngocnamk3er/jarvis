@@ -7,7 +7,6 @@ import { Sidebar } from "./sidebar"
 import { EmptyState } from "./empty-state"
 import { MessageList } from "./message-list"
 import { ChatInput } from "./chat-input"
-import { UpgradeBanner } from "./upgrade-banner"
 
 export function ChatWindow() {
   const { conversations, create, remove } = useConversations()
@@ -23,9 +22,8 @@ export function ChatWindow() {
     }
   }, [activeId, sendMessage])
 
-  const handleNewChat = async () => {
-    const conv = await create()
-    setActiveId(conv.id)
+  const handleNewChat = () => {
+    setActiveId(null)
     clearMessages()
   }
 
@@ -73,7 +71,6 @@ export function ChatWindow() {
           )}
           <ChatInput onSend={handleSend} disabled={isLoading} />
         </div>
-        <UpgradeBanner />
       </div>
     </div>
   )
