@@ -8,8 +8,17 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { Message } from "@/types/chat"
 import { ToolBadge } from "./tool-badge"
+import { extractFilesFromMessage, FileChips, GeneratedFile } from "./file-tray"
 
-export function MessageItem({ message }: { message: Message }) {
+export function MessageItem({
+  message,
+  previewFile,
+  onPreviewFile,
+}: {
+  message: Message
+  previewFile: GeneratedFile | null
+  onPreviewFile: (f: GeneratedFile | null) => void
+}) {
   const [copied, setCopied] = useState(false)
 
   const plainText = message.parts
@@ -138,10 +147,7 @@ export function MessageItem({ message }: { message: Message }) {
           )
         })}
 
-        {message.isStreaming && (() => {
-          const last = message.parts[message.parts.length - 1]
-          return message.parts.length === 0 || (last?.type === "tool" && last.tool.status === "done")
-        })() && (
+        {message.isStreaming && !message.parts.some(p => p.type === "text" && p.content.length > 0) && (
           <div className="flex items-center gap-[5px] py-1">
             {[0, 1, 2].map((i) => (
               <span
@@ -154,6 +160,14 @@ export function MessageItem({ message }: { message: Message }) {
               />
             ))}
           </div>
+        )}
+
+        {!message.isStreaming && (
+          <FileChips
+            files={extractFilesFromMessage(message)}
+            previewFile={previewFile}
+            onSelect={onPreviewFile}
+          />
         )}
       </div>
     </div>

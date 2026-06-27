@@ -9,6 +9,7 @@ import { Sidebar } from "./sidebar"
 import { EmptyState } from "./empty-state"
 import { MessageList } from "./message-list"
 import { ChatInput } from "./chat-input"
+import { PreviewPanel, GeneratedFile } from "./file-tray"
 
 export function ChatWindow() {
   const router = useRouter()
@@ -20,6 +21,7 @@ export function ChatWindow() {
   const pendingContent = useRef<string | null>(null)
 
   const { messages, isLoading, sendMessage, clearMessages, loadHistory } = useChat(activeId)
+  const [previewFile, setPreviewFile] = useState<GeneratedFile | null>(null)
 
   async function openConversation(id: string) {
     const isPending = await loadHistory(id)
@@ -102,7 +104,7 @@ export function ChatWindow() {
       <div className="flex flex-1 min-w-0 overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden">
           {hasMessages ? (
-            <MessageList messages={messages} />
+            <MessageList messages={messages} previewFile={previewFile} onPreviewFile={setPreviewFile} />
           ) : (
             <EmptyState onSend={handleSend} />
           )}
@@ -124,6 +126,10 @@ export function ChatWindow() {
 
           <ChatInput onSend={handleSend} disabled={isLoading} />
         </div>
+
+        {previewFile && (
+          <PreviewPanel file={previewFile} onClose={() => setPreviewFile(null)} />
+        )}
       </div>
     </div>
   )
