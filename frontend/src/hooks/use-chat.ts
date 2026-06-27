@@ -18,13 +18,6 @@ function parseSSELine(line: string): StreamEvent | null {
   }
 }
 
-function textContent(parts: MessagePart[]): string {
-  return parts
-    .filter((p): p is { type: "text"; content: string } => p.type === "text")
-    .map((p) => p.content)
-    .join("")
-}
-
 function findLastStreamingTool(parts: MessagePart[]): number {
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i]
@@ -33,7 +26,7 @@ function findLastStreamingTool(parts: MessagePart[]): number {
   return -1
 }
 
-export function useChat() {
+export function useChat(threadId: string | null) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
@@ -44,8 +37,24 @@ export function useChat() {
     []
   )
 
+  const loadHistory = useCallback(async (id: string) => {
+    const res = await fetch(`${API_URL}/api/v1/conversations/${id}/messages`)
+    const data: { role: string; content: string }[] = await res.json()
+    const loaded: Message[] = data.map((m) => ({
+      id: makeId(),
+      role: m.role as "user" | "assistant",
+      parts: [{ type: "text" as const, content: m.content }],
+      isStreaming: false,
+    }))
+    setMessages(loaded)
+  }, [])
+
+  const clearMessages = useCallback(() => setMessages([]), [])
+
   const sendMessage = useCallback(
     async (content: string) => {
+      if (!threadId) return
+
       const userMessage: Message = {
         id: makeId(),
         role: "user",
@@ -65,15 +74,10 @@ export function useChat() {
       setIsLoading(true)
 
       try {
-        const history = [...messages, userMessage].map((m) => ({
-          role: m.role,
-          content: textContent(m.parts),
-        }))
-
         const res = await fetch(`${API_URL}/api/v1/chat/stream`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: history }),
+          body: JSON.stringify({ thread_id: threadId, content }),
         })
 
         if (!res.body) throw new Error("No response body")
@@ -112,20 +116,12 @@ export function useChat() {
                 updateAssistant(assistantId, (m) => {
                   const parts = [...m.parts]
                   if (event.name) {
-                    // First chunk for a new tool call — create the part
-                    parts.push({
-                      type: "tool",
-                      tool: { name: event.name, argsStr: event.args_delta, status: "streaming" },
-                    })
+                    parts.push({ type: "tool", tool: { name: event.name, argsStr: event.args_delta, status: "streaming" } })
                   } else {
-                    // Subsequent chunk — append args to the last streaming tool
                     const idx = findLastStreamingTool(parts)
                     if (idx !== -1) {
                       const p = parts[idx] as { type: "tool"; tool: ToolCall }
-                      parts[idx] = {
-                        ...p,
-                        tool: { ...p.tool, argsStr: (p.tool.argsStr ?? "") + event.args_delta },
-                      }
+                      parts[idx] = { ...p, tool: { ...p.tool, argsStr: (p.tool.argsStr ?? "") + event.args_delta } }
                     }
                   }
                   return { ...m, parts }
@@ -138,7 +134,6 @@ export function useChat() {
                     (p) => p.type === "tool" && p.tool.name === event.name && p.tool.status === "streaming"
                   )
                   if (hasStreaming) {
-                    // Transition streaming → running (model streamed args chunk by chunk)
                     return {
                       ...m,
                       parts: m.parts.map((p) =>
@@ -148,13 +143,9 @@ export function useChat() {
                       ),
                     }
                   }
-                  // Model sent args all at once — create the tool part directly
                   return {
                     ...m,
-                    parts: [
-                      ...m.parts,
-                      { type: "tool" as const, tool: { name: event.name, input: event.input, status: "running" as const } },
-                    ],
+                    parts: [...m.parts, { type: "tool" as const, tool: { name: event.name, input: event.input, status: "running" as const } }],
                   }
                 })
                 break
@@ -163,8 +154,7 @@ export function useChat() {
                 updateAssistant(assistantId, (m) => ({
                   ...m,
                   parts: m.parts.map((p) =>
-                    p.type === "tool" &&
-                    p.tool.name === event.name &&
+                    p.type === "tool" && p.tool.name === event.name &&
                     (p.tool.status === "running" || p.tool.status === "streaming")
                       ? { ...p, tool: { ...p.tool, output: event.output, status: "done" as const } }
                       : p
@@ -196,9 +186,8 @@ export function useChat() {
         setIsLoading(false)
       }
     },
-    [messages, updateAssistant]
+    [threadId, updateAssistant]
   )
 
-  const clearMessages = useCallback(() => setMessages([]), [])
-  return { messages, isLoading, sendMessage, clearMessages }
+  return { messages, isLoading, sendMessage, clearMessages, loadHistory }
 }

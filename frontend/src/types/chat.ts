@@ -4,8 +4,8 @@ export type ToolStatus = "streaming" | "running" | "done"
 
 export type ToolCall = {
   name: string
-  argsStr?: string    // accumulated raw args string while streaming
-  input?: unknown     // parsed input once tool_start fires
+  argsStr?: string
+  input?: unknown
   output?: string
   status: ToolStatus
 }
@@ -28,3 +28,10 @@ export type StreamEvent =
   | { type: "tool_end"; name: string; output: string }
   | { type: "done" }
   | { type: "error"; message: string }
+
+export type Conversation = {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
+}
