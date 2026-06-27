@@ -98,7 +98,7 @@ export function MessageItem({
   }
 
   return (
-    <div className="flex flex-col max-w-[80%]">
+    <div className="flex flex-col max-w-[95%]">
       <div className="flex items-center gap-2 mb-2">
         <div className="size-[22px] rounded-full bg-[#5661f6] flex items-center justify-center shrink-0">
           <span className="text-white text-[8px] font-bold tracking-tight">AI</span>

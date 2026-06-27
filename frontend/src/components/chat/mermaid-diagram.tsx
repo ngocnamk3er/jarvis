@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { VizContainer } from "./viz-container"
 
 type MermaidLib = typeof import("mermaid")["default"]
 let lib: MermaidLib | null = null
@@ -45,11 +46,8 @@ export function MermaidDiagram({ code, title }: Props) {
   }
 
   return (
-    <div className="my-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-      {title && (
-        <p className="mb-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wide">{title}</p>
-      )}
-      <div ref={containerRef} className="overflow-x-auto flex justify-center [&_svg]:max-w-full" />
-    </div>
+    <VizContainer title={title}>
+      <div ref={containerRef} className="[&_svg]:max-w-none" />
+    </VizContainer>
   )
 }
