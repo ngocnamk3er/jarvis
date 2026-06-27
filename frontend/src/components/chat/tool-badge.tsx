@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronDown, ChevronRight, Loader2, Wrench } from "lucide-react"
+import { ChevronDown, ChevronRight, Download, Loader2, Wrench } from "lucide-react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
 import ReactMarkdown from "react-markdown"
@@ -54,6 +54,19 @@ function InputBlock({ input }: { input: unknown }) {
   )
 }
 
+function DownloadLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      download
+      className="inline-flex items-center gap-1.5 bg-[#5661f6] text-white rounded-lg px-3 py-1.5 text-[12px] font-medium hover:bg-[#4550e0] transition-colors no-underline mt-1"
+    >
+      <Download className="size-3 shrink-0" />
+      {children}
+    </a>
+  )
+}
+
 function OutputBlock({ output }: { output: string }) {
   const text = output?.trim()
   if (!text || text === "(no output)") {
@@ -70,10 +83,17 @@ function OutputBlock({ output }: { output: string }) {
       <div className="bg-[#F0F4FF] rounded-xl px-4 py-3 border border-[#E0E7FF] text-[12px] leading-[18px] text-gray-700
         [&_p]:mb-2 [&_p:last-child]:mb-0
         [&_strong]:font-semibold [&_strong]:text-gray-800
-        [&_a]:text-[#5661f6] [&_a]:underline [&_a]:break-all
         [&_ul]:pl-4 [&_ul]:my-1 [&_li]:my-0.5
         [&_hr]:border-[#E0E7FF] [&_hr]:my-2">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            a: ({ href, children }) =>
+              href?.includes("/api/v1/files/")
+                ? <DownloadLink href={href}>{children}</DownloadLink>
+                : <a href={href} className="text-[#5661f6] underline break-all" target="_blank" rel="noreferrer">{children}</a>,
+          }}
+        >
           {text}
         </ReactMarkdown>
       </div>
