@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
-import { Copy, Check, Brain, ChevronDown } from "lucide-react"
+import { Copy, Check, Brain, ChevronDown, BarChart2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
@@ -122,9 +122,22 @@ export function MessageItem({
           }
 
           if (part.type === "viz") {
-            return part.format === "svg"
-              ? <SvgDiagram key={i} code={part.code} title={part.title} />
-              : <MermaidDiagram key={i} code={part.code} title={part.title} />
+            return (
+              <div key={i} className="py-1">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <BarChart2 className="size-3 text-[#5661f6] shrink-0" />
+                  <span className="text-[12px] font-semibold text-gray-600 font-mono">
+                    {part.format === "svg" ? "generate_visualization_svg" : "generate_visualization_mermaid"}
+                  </span>
+                </div>
+                <div className="ml-1 border-l-2 border-[#E0E7FF] pl-3.5">
+                  {part.format === "svg"
+                    ? <SvgDiagram code={part.code} title={part.title} />
+                    : <MermaidDiagram code={part.code} title={part.title} />
+                  }
+                </div>
+              </div>
+            )
           }
 
           const isLast = i === message.parts.length - 1
