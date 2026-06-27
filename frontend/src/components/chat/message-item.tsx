@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Copy, Check } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Copy, Check, Brain, ChevronDown } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
@@ -9,6 +9,38 @@ import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { Message } from "@/types/chat"
 import { ToolBadge } from "./tool-badge"
 import { extractFilesFromMessage, FileChips, GeneratedFile } from "./file-tray"
+
+function ThinkingBlock({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
+  const [isOpen, setIsOpen] = useState(true)
+
+  useEffect(() => {
+    if (!isStreaming) setIsOpen(false)
+  }, [isStreaming])
+
+  return (
+    <div className="mb-2">
+      <button
+        onClick={() => setIsOpen((o) => !o)}
+        className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-gray-500 transition-colors select-none"
+      >
+        <Brain className="size-3.5 shrink-0" />
+        <span className="font-medium">{isStreaming ? "Thinking…" : "Thought process"}</span>
+        <ChevronDown
+          className="size-3 transition-transform duration-200"
+          style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+        />
+      </button>
+      {isOpen && (
+        <div className="mt-1.5 ml-5 pl-3 border-l-2 border-gray-100 text-[12px] text-gray-400 font-mono leading-[18px] whitespace-pre-wrap max-h-52 overflow-y-auto">
+          {content}
+          {isStreaming && (
+            <span className="ml-0.5 inline-block w-[3px] h-[11px] bg-gray-400 opacity-60 animate-pulse align-text-bottom" />
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function MessageItem({
   message,
@@ -71,6 +103,10 @@ export function MessageItem({
 
       <div className="bg-white rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm space-y-1">
         {message.parts.map((part, i) => {
+          if (part.type === "thinking") {
+            return <ThinkingBlock key={i} content={part.content} isStreaming={part.isStreaming} />
+          }
+
           if (part.type === "tool") {
             const autoCollapsed = message.parts.slice(i + 1).some(
               (p) => p.type === "tool" || (p.type === "text" && p.content.length > 0)

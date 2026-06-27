@@ -14,6 +14,7 @@ export type ToolCall = {
 export type MessagePart =
   | { type: "text"; content: string }
   | { type: "tool"; tool: ToolCall }
+  | { type: "thinking"; content: string; isStreaming?: boolean }
 
 export type Message = {
   id: string
@@ -24,6 +25,7 @@ export type Message = {
 
 export type StreamEvent =
   | { type: "token"; content: string }
+  | { type: "thinking_token"; content: string }
   | { type: "tool_chunk"; index: number; name: string; args_delta: string }
   | { type: "tool_start"; name: string; input?: unknown }
   | { type: "tool_end"; name: string; output: string }

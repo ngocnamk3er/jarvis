@@ -100,12 +100,30 @@ export function useChat(threadId: string | null) {
             if (!event) continue
 
             switch (event.type) {
-              case "token":
+              case "thinking_token":
                 updateAssistant(assistantId, (m) => {
                   const parts = [...m.parts]
                   const last = parts[parts.length - 1]
-                  if (last?.type === "text") {
-                    parts[parts.length - 1] = { type: "text", content: last.content + event.content }
+                  if (last?.type === "thinking") {
+                    parts[parts.length - 1] = { type: "thinking", content: last.content + event.content, isStreaming: true }
+                  } else {
+                    parts.push({ type: "thinking", content: event.content, isStreaming: true })
+                  }
+                  return { ...m, parts }
+                })
+                break
+
+              case "token":
+                updateAssistant(assistantId, (m) => {
+                  const parts = [...m.parts]
+                  // Seal any open thinking block before emitting response text
+                  const last = parts[parts.length - 1]
+                  if (last?.type === "thinking" && last.isStreaming) {
+                    parts[parts.length - 1] = { ...last, isStreaming: false }
+                  }
+                  const updated = parts[parts.length - 1]
+                  if (updated?.type === "text") {
+                    parts[parts.length - 1] = { type: "text", content: updated.content + event.content }
                   } else {
                     parts.push({ type: "text", content: event.content })
                   }
@@ -173,7 +191,13 @@ export function useChat(threadId: string | null) {
                 break
 
               case "done":
-                updateAssistant(assistantId, (m) => ({ ...m, isStreaming: false }))
+                updateAssistant(assistantId, (m) => ({
+                  ...m,
+                  isStreaming: false,
+                  parts: m.parts.map((p) =>
+                    p.type === "thinking" ? { ...p, isStreaming: false } : p
+                  ),
+                }))
                 break
 
               case "error":
