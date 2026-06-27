@@ -1,5 +1,7 @@
 export type Role = "user" | "assistant"
 
+export type ThinkingEffort = "low" | "medium" | "high" | "xhigh"
+
 export type ToolStatus = "streaming" | "running" | "done"
 
 export type ToolCall = {

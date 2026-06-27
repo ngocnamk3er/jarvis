@@ -18,7 +18,7 @@ export function ChatWindow() {
   const { conversations, create, remove } = useConversations()
   const [activeId, setActiveId] = useState<string | null>(null)
   const [interrupted, setInterrupted] = useState(false)
-  const pendingContent = useRef<string | null>(null)
+  const pendingContent = useRef<{ content: string; effort: import("@/types/chat").ThinkingEffort } | null>(null)
 
   const { messages, isLoading, sendMessage, clearMessages, loadHistory } = useChat(activeId)
   const [previewFile, setPreviewFile] = useState<GeneratedFile | null>(null)
@@ -41,7 +41,7 @@ export function ChatWindow() {
   // Send pending message after activeId is set (new conversation flow)
   useEffect(() => {
     if (activeId && pendingContent.current) {
-      sendMessage(pendingContent.current)
+      sendMessage(pendingContent.current.content, pendingContent.current.effort)
       pendingContent.current = null
     }
   }, [activeId, sendMessage])
@@ -70,14 +70,14 @@ export function ChatWindow() {
     }
   }
 
-  const handleSend = async (content: string) => {
+  const handleSend = async (content: string, effort: import("@/types/chat").ThinkingEffort = "high") => {
     setInterrupted(false)
     if (!activeId) {
-      pendingContent.current = content
+      pendingContent.current = { content, effort }
       const conv = await create(content.slice(0, 50))
       activate(conv.id)
     } else {
-      sendMessage(content)
+      sendMessage(content, effort)
     }
   }
 
