@@ -190,6 +190,13 @@ export function useChat(threadId: string | null) {
                 }))
                 break
 
+              case "viz":
+                updateAssistant(assistantId, (m) => ({
+                  ...m,
+                  parts: [...m.parts, { type: "viz" as const, format: event.format, code: event.code, title: event.title }],
+                }))
+                break
+
               case "done":
                 updateAssistant(assistantId, (m) => ({
                   ...m,

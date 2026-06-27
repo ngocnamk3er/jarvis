@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import dynamic from "next/dynamic"
 import { Copy, Check, Brain, ChevronDown } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -8,7 +9,13 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { Message } from "@/types/chat"
 import { ToolBadge } from "./tool-badge"
+import { SvgDiagram } from "./svg-diagram"
 import { extractFilesFromMessage, FileChips, GeneratedFile } from "./file-tray"
+
+const MermaidDiagram = dynamic(
+  () => import("./mermaid-diagram").then((m) => m.MermaidDiagram),
+  { ssr: false, loading: () => <div className="my-3 h-24 rounded-xl bg-gray-50 animate-pulse" /> }
+)
 
 function ThinkingBlock({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
   const [isOpen, setIsOpen] = useState(true)
@@ -112,6 +119,12 @@ export function MessageItem({
               (p) => p.type === "tool" || (p.type === "text" && p.content.length > 0)
             )
             return <ToolBadge key={i} tool={part.tool} autoCollapsed={autoCollapsed} />
+          }
+
+          if (part.type === "viz") {
+            return part.format === "svg"
+              ? <SvgDiagram key={i} code={part.code} title={part.title} />
+              : <MermaidDiagram key={i} code={part.code} title={part.title} />
           }
 
           const isLast = i === message.parts.length - 1
