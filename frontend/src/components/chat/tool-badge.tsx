@@ -89,7 +89,7 @@ function OutputBlock({ output }: { output: string }) {
           remarkPlugins={[remarkGfm]}
           components={{
             a: ({ href, children }) =>
-              href?.includes("/api/v1/files/")
+              href?.includes("/api/v1/files/") || href?.includes("/jarvis-files/")
                 ? <DownloadLink href={href}>{children}</DownloadLink>
                 : <a href={href} className="text-[#5661f6] underline break-all" target="_blank" rel="noreferrer">{children}</a>,
           }}
