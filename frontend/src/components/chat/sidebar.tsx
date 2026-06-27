@@ -16,7 +16,7 @@ export function Sidebar({ conversations, activeId, onNewChat, onSelect, onDelete
   return (
     <aside className="w-[220px] bg-white flex flex-col h-full shrink-0 border-r border-gray-100">
       <div className="px-5 pt-7 pb-4">
-        <h1 className="text-[11px] font-bold tracking-[0.22em] text-gray-900 uppercase">Chat A.I+</h1>
+        <h1 className="text-[11px] font-bold tracking-[0.22em] text-gray-900 uppercase">Jarvis</h1>
       </div>
 
       <div className="px-4 pb-5 flex items-center gap-2">

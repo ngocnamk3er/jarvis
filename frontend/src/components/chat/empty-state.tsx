@@ -31,7 +31,7 @@ export function EmptyState({ onSend }: { onSend: (text: string) => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-10 py-10 overflow-y-auto">
       <p className="text-[10px] font-bold tracking-[0.3em] text-gray-400 mb-3 uppercase">
-        Chat A.I+
+        Jarvis
       </p>
       <h2 className="text-[28px] font-bold text-gray-900 mb-10 text-center leading-tight tracking-tight">
         Good day! How may I assist you today?

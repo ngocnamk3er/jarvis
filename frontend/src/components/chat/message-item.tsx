@@ -97,7 +97,7 @@ export function MessageItem({
           <span className="text-white text-[8px] font-bold tracking-tight">AI</span>
         </div>
         <span className="text-[11px] font-semibold text-gray-500 tracking-wide uppercase">
-          Chat A.I ⓘ
+          Jarvis
         </span>
       </div>
 

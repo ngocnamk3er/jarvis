@@ -9,7 +9,7 @@ const jakarta = Plus_Jakarta_Sans({
 })
 
 export const metadata: Metadata = {
-  title: "Jarvis — Chat A.I+",
+  title: "Jarvis",
   description: "Your AI assistant",
 }
 
