@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ChevronDown, ChevronRight, Loader2, Wrench } from "lucide-react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
@@ -92,8 +92,12 @@ function StreamingArgsPreview({ argsStr }: { argsStr: string }) {
   )
 }
 
-export function ToolBadge({ tool }: { tool: ToolCall }) {
-  const [open, setOpen] = useState(false)
+export function ToolBadge({ tool, autoCollapsed }: { tool: ToolCall; autoCollapsed?: boolean }) {
+  const [open, setOpen] = useState(!autoCollapsed)
+
+  useEffect(() => {
+    if (autoCollapsed) setOpen(false)
+  }, [autoCollapsed])
 
   // Streaming args — show tool name + partial args with cursor
   if (tool.status === "streaming") {
@@ -108,14 +112,20 @@ export function ToolBadge({ tool }: { tool: ToolCall }) {
     )
   }
 
-  // Running (args done, tool executing)
+  // Running — show input expanded so user sees what's executing
   if (tool.status === "running") {
     return (
-      <div className="flex items-center gap-2 py-1">
-        <Loader2 className="size-3 animate-spin text-[#5661f6]" />
-        <span className="text-[12px] font-medium text-gray-500">
-          Running <span className="font-semibold text-[#5661f6] font-mono">{tool.name}</span>…
-        </span>
+      <div className="py-1">
+        <div className="flex items-center gap-1.5 mb-2">
+          <Loader2 className="size-3 animate-spin text-[#5661f6]" />
+          <span className="text-[12px] font-semibold text-[#5661f6] font-mono">{tool.name}</span>
+          <span className="text-[11px] text-gray-400">running…</span>
+        </div>
+        {tool.input !== undefined && (
+          <div className="ml-1 border-l-2 border-[#E0E7FF] pl-3.5">
+            <InputBlock input={tool.input} />
+          </div>
+        )}
       </div>
     )
   }

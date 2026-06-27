@@ -27,9 +27,11 @@ export function MessageItem({ message }: { message: Message }) {
     return (
       <div className="flex justify-end group">
         <div className="max-w-[65%]">
-          <p className="text-[14px] font-medium text-gray-700 text-right leading-[22px]">
-            {plainText}
-          </p>
+          <div className="bg-[#5661f6] rounded-2xl rounded-tr-sm px-4 py-3">
+            <p className="text-[14px] font-medium text-white leading-[22px] whitespace-pre-wrap">
+              {plainText}
+            </p>
+          </div>
           <div className="flex justify-end mt-1">
             <button
               onClick={copy}
@@ -61,7 +63,10 @@ export function MessageItem({ message }: { message: Message }) {
       <div className="bg-white rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm space-y-1">
         {message.parts.map((part, i) => {
           if (part.type === "tool") {
-            return <ToolBadge key={i} tool={part.tool} />
+            const autoCollapsed = message.parts.slice(i + 1).some(
+              (p) => p.type === "tool" || (p.type === "text" && p.content.length > 0)
+            )
+            return <ToolBadge key={i} tool={part.tool} autoCollapsed={autoCollapsed} />
           }
 
           const isLast = i === message.parts.length - 1
@@ -133,8 +138,22 @@ export function MessageItem({ message }: { message: Message }) {
           )
         })}
 
-        {message.isStreaming && message.parts.length === 0 && (
-          <span className="inline-block w-[5px] h-[15px] bg-[#5661f6] opacity-80 animate-pulse rounded-sm" />
+        {message.isStreaming && (() => {
+          const last = message.parts[message.parts.length - 1]
+          return message.parts.length === 0 || (last?.type === "tool" && last.tool.status === "done")
+        })() && (
+          <div className="flex items-center gap-[5px] py-1">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="size-2 rounded-full bg-[#5661f6]"
+                style={{
+                  animation: "wave 1.2s ease-in-out infinite",
+                  animationDelay: `${i * 0.2}s`,
+                }}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>

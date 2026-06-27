@@ -4,6 +4,7 @@ export type ToolStatus = "streaming" | "running" | "done"
 
 export type ToolCall = {
   name: string
+  chunkIndex?: number
   argsStr?: string
   input?: unknown
   output?: string

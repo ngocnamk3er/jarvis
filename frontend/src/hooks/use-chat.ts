@@ -18,10 +18,10 @@ function parseSSELine(line: string): StreamEvent | null {
   }
 }
 
-function findLastStreamingTool(parts: MessagePart[]): number {
+function findStreamingToolByIndex(parts: MessagePart[], chunkIndex: number): number {
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i]
-    if (p.type === "tool" && p.tool.status === "streaming") return i
+    if (p.type === "tool" && p.tool.status === "streaming" && p.tool.chunkIndex === chunkIndex) return i
   }
   return -1
 }
@@ -37,16 +37,17 @@ export function useChat(threadId: string | null) {
     []
   )
 
-  const loadHistory = useCallback(async (id: string) => {
+  const loadHistory = useCallback(async (id: string): Promise<boolean> => {
     const res = await fetch(`${API_URL}/api/v1/conversations/${id}/messages`)
-    const data: { role: string; parts: MessagePart[] }[] = await res.json()
-    const loaded: Message[] = data.map((m) => ({
+    const data: { messages: { role: string; parts: MessagePart[] }[]; is_pending: boolean } = await res.json()
+    const loaded: Message[] = data.messages.map((m) => ({
       id: makeId(),
       role: m.role as "user" | "assistant",
       parts: m.parts,
       isStreaming: false,
     }))
     setMessages(loaded)
+    return data.is_pending ?? false
   }, [])
 
   const clearMessages = useCallback(() => setMessages([]), [])
@@ -112,33 +113,42 @@ export function useChat(threadId: string | null) {
                 })
                 break
 
-              case "tool_chunk":
+              case "tool_chunk": {
                 updateAssistant(assistantId, (m) => {
                   const parts = [...m.parts]
-                  if (event.name) {
-                    parts.push({ type: "tool", tool: { name: event.name, argsStr: event.args_delta, status: "streaming" } })
-                  } else {
-                    const idx = findLastStreamingTool(parts)
-                    if (idx !== -1) {
-                      const p = parts[idx] as { type: "tool"; tool: ToolCall }
-                      parts[idx] = { ...p, tool: { ...p.tool, argsStr: (p.tool.argsStr ?? "") + event.args_delta } }
+                  const existing = findStreamingToolByIndex(parts, event.index)
+                  if (existing !== -1) {
+                    const p = parts[existing] as { type: "tool"; tool: ToolCall }
+                    parts[existing] = {
+                      ...p,
+                      tool: {
+                        ...p.tool,
+                        ...(event.name ? { name: event.name } : {}),
+                        argsStr: (p.tool.argsStr ?? "") + event.args_delta,
+                      },
                     }
+                  } else if (event.name) {
+                    parts.push({
+                      type: "tool",
+                      tool: { name: event.name, chunkIndex: event.index, argsStr: event.args_delta, status: "streaming" },
+                    })
                   }
                   return { ...m, parts }
                 })
                 break
+              }
 
               case "tool_start":
                 updateAssistant(assistantId, (m) => {
-                  const hasStreaming = m.parts.some(
+                  const streamingIdx = m.parts.findIndex(
                     (p) => p.type === "tool" && p.tool.name === event.name && p.tool.status === "streaming"
                   )
-                  if (hasStreaming) {
+                  if (streamingIdx !== -1) {
                     return {
                       ...m,
-                      parts: m.parts.map((p) =>
-                        p.type === "tool" && p.tool.name === event.name && p.tool.status === "streaming"
-                          ? { ...p, tool: { ...p.tool, input: event.input, status: "running" as const } }
+                      parts: m.parts.map((p, i) =>
+                        i === streamingIdx
+                          ? { ...p, tool: { ...(p as { type: "tool"; tool: ToolCall }).tool, input: event.input, status: "running" as const } }
                           : p
                       ),
                     }
