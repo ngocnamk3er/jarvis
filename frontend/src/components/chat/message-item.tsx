@@ -147,7 +147,7 @@ export function MessageItem({
           )
         })}
 
-        {message.isStreaming && !message.parts.some(p => p.type === "text" && p.content.length > 0) && (
+        {message.isStreaming && (
           <div className="flex items-center gap-[5px] py-1">
             {[0, 1, 2].map((i) => (
               <span
