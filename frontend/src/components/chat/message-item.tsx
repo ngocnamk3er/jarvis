@@ -9,11 +9,15 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { Message } from "@/types/chat"
 import { ToolBadge } from "./tool-badge"
-import { SvgDiagram } from "./svg-diagram"
 import { extractFilesFromMessage, FileChips, GeneratedFile } from "./file-tray"
 
 const MermaidDiagram = dynamic(
   () => import("./mermaid-diagram").then((m) => m.MermaidDiagram),
+  { ssr: false, loading: () => <div className="my-3 h-24 rounded-xl bg-gray-50 animate-pulse" /> }
+)
+
+const SvgDiagram = dynamic(
+  () => import("./svg-diagram").then((m) => m.SvgDiagram),
   { ssr: false, loading: () => <div className="my-3 h-24 rounded-xl bg-gray-50 animate-pulse" /> }
 )
 
