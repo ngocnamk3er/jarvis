@@ -76,8 +76,8 @@ export function Sidebar({ conversations, activeId, onNewChat, onSelect, onDelete
           Settings
         </button>
         <div className="flex items-center gap-2.5 px-2 py-1.5 mt-0.5">
-          <div className="size-6 rounded-full bg-orange-400 flex items-center justify-center text-white text-[10px] font-bold shrink-0">A</div>
-          <span className="text-[13px] font-medium text-gray-700 truncate">Andrew Nelson</span>
+          <div className="size-6 rounded-full bg-orange-400 flex items-center justify-center text-white text-[10px] font-bold shrink-0">N</div>
+          <span className="text-[13px] font-medium text-gray-700 truncate">Nam Nguyen</span>
         </div>
       </div>
     </aside>

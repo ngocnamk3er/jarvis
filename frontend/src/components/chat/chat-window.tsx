@@ -70,14 +70,14 @@ export function ChatWindow() {
     }
   }
 
-  const handleSend = async (content: string, effort: import("@/types/chat").ThinkingEffort = "high") => {
+  const handleSend = async (content: string, effort: import("@/types/chat").ThinkingEffort = "high", model?: import("@/types/chat").Model) => {
     setInterrupted(false)
     if (!activeId) {
       pendingContent.current = { content, effort }
       const conv = await create(content.slice(0, 50))
       activate(conv.id)
     } else {
-      sendMessage(content, effort)
+      sendMessage(content, effort, model)
     }
   }
 

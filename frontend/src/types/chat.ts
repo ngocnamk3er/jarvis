@@ -2,6 +2,11 @@ export type Role = "user" | "assistant"
 
 export type ThinkingEffort = "low" | "medium" | "high" | "xhigh"
 
+export type Model = {
+  id: string
+  name: string
+}
+
 export type ToolStatus = "streaming" | "running" | "done"
 
 export type ToolCall = {
@@ -17,7 +22,7 @@ export type MessagePart =
   | { type: "text"; content: string }
   | { type: "tool"; tool: ToolCall }
   | { type: "thinking"; content: string; isStreaming?: boolean }
-  | { type: "viz"; format: "mermaid" | "svg"; code: string; title?: string }
+  | { type: "viz"; format: "mermaid" | "svg" | "html"; code: string; title?: string }
 
 export type Message = {
   id: string
@@ -32,7 +37,7 @@ export type StreamEvent =
   | { type: "tool_chunk"; index: number; name: string; args_delta: string }
   | { type: "tool_start"; name: string; input?: unknown }
   | { type: "tool_end"; name: string; output: string }
-  | { type: "viz"; format: "mermaid" | "svg"; code: string; title?: string }
+  | { type: "viz"; format: "mermaid" | "svg" | "html"; code: string; title?: string }
   | { type: "done" }
   | { type: "error"; message: string }
 

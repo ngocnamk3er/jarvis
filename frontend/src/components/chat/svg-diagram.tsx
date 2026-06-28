@@ -2,6 +2,20 @@
 
 import { VizContainer } from "./viz-container"
 
+// HTML entities are invalid in SVG XML — replace with Unicode equivalents
+const HTML_ENTITIES: Record<string, string> = {
+  "&nbsp;": " ", "&mdash;": "—", "&ndash;": "–",
+  "&hellip;": "…", "&laquo;": "«", "&raquo;": "»",
+  "&ldquo;": "“", "&rdquo;": "”", "&lsquo;": "‘", "&rsquo;": "’",
+  "&copy;": "©", "&reg;": "®", "&trade;": "™",
+  "&times;": "×", "&divide;": "÷", "&plusmn;": "±",
+  "&deg;": "°", "&micro;": "µ", "&middot;": "·",
+}
+
+function sanitizeSvg(svg: string): string {
+  return svg.replace(/&[a-zA-Z]+;/g, (e) => HTML_ENTITIES[e] ?? e)
+}
+
 type Props = { code: string; title?: string }
 
 export function SvgDiagram({ code, title }: Props) {
@@ -15,7 +29,7 @@ export function SvgDiagram({ code, title }: Props) {
     )
   }
 
-  const dataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(trimmed)}`
+  const dataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sanitizeSvg(trimmed))}`
 
   return (
     <VizContainer title={title}>

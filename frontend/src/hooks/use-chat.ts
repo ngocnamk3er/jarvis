@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { Message, MessagePart, StreamEvent, ThinkingEffort, ToolCall } from "@/types/chat"
+import { Message, MessagePart, StreamEvent, ThinkingEffort, ToolCall, Model } from "@/types/chat"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
@@ -53,7 +53,7 @@ export function useChat(threadId: string | null) {
   const clearMessages = useCallback(() => setMessages([]), [])
 
   const sendMessage = useCallback(
-    async (content: string, thinking_effort: ThinkingEffort = "high") => {
+    async (content: string, thinking_effort: ThinkingEffort = "high", model?: Model) => {
       if (!threadId) return
 
       const userMessage: Message = {
@@ -78,7 +78,7 @@ export function useChat(threadId: string | null) {
         const res = await fetch(`${API_URL}/api/v1/chat/stream`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ thread_id: threadId, content, thinking_effort }),
+          body: JSON.stringify({ thread_id: threadId, content, thinking_effort, model: model?.id }),
         })
 
         if (!res.body) throw new Error("No response body")
