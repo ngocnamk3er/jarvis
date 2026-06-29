@@ -208,7 +208,7 @@ export function extractFilesFromMessage(message: Message): GeneratedFile[] {
   const seen = new Set<string>()
   const files: GeneratedFile[] = []
   for (const part of message.parts) {
-    if (part.type !== "tool" || !part.tool.output) continue
+    if (part.type !== "tool" || part.tool.name !== "represent_file" || !part.tool.output) continue
     const re = /\[⬇ Download ([^\]]+)\]\((https?:\/\/[^)]+)\)/g
     for (const m of part.tool.output.matchAll(re)) {
       const [, name, url] = m
