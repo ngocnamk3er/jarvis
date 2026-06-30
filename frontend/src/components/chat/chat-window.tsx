@@ -124,7 +124,16 @@ export function ChatWindow() {
             </div>
           )}
 
-          <ChatInput onSend={handleSend} disabled={isLoading} />
+          <ChatInput
+            onSend={handleSend}
+            disabled={isLoading}
+            threadId={activeId}
+            onCreateConversation={async () => {
+              const conv = await create("New conversation")
+              activate(conv.id)
+              return conv.id
+            }}
+          />
         </div>
 
         {previewFile && (

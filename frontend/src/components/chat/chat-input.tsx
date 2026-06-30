@@ -1,9 +1,11 @@
 "use client"
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react"
-import { SendHorizontal, Loader2, Brain, ChevronDown, Check, Cpu } from "lucide-react"
+import { SendHorizontal, Loader2, Brain, ChevronDown, Check, Cpu, Paperclip, X, File } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThinkingEffort, Model } from "@/types/chat"
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 const EFFORT_OPTIONS: { value: ThinkingEffort; label: string; desc: string }[] = [
   { value: "low", label: "Low", desc: "Faster, lighter thinking" },
@@ -14,7 +16,7 @@ const EFFORT_OPTIONS: { value: ThinkingEffort; label: string; desc: string }[] =
 
 type ModelOption = Model & {
   desc: string
-  inputPrice: string  // per M tokens
+  inputPrice: string
   outputPrice: string
   context: string
 }
@@ -62,22 +64,30 @@ const MODELS: ModelOption[] = [
   },
 ]
 
-const DEFAULT_MODEL = MODELS[0] // GPT-5 Nano
+const DEFAULT_MODEL = MODELS[0]
+
+type AttachedFile = { name: string; virtualPath: string }
 
 type Props = {
   onSend: (content: string, effort: ThinkingEffort, model: Model) => void
   disabled: boolean
+  threadId: string | null
+  onCreateConversation?: () => Promise<string>
 }
 
-export function ChatInput({ onSend, disabled }: Props) {
+export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: Props) {
   const [value, setValue] = useState("")
   const [effort, setEffort] = useState<ThinkingEffort>("high")
   const [model, setModel] = useState<ModelOption>(DEFAULT_MODEL)
   const [effortOpen, setEffortOpen] = useState(false)
   const [modelOpen, setModelOpen] = useState(false)
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
+  const [uploading, setUploading] = useState(false)
+
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const effortRef = useRef<HTMLDivElement>(null)
   const modelRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const resize = () => {
     const el = textareaRef.current
@@ -88,9 +98,17 @@ export function ChatInput({ onSend, disabled }: Props) {
 
   const submit = () => {
     const trimmed = value.trim()
-    if (!trimmed || disabled) return
-    onSend(trimmed, effort, model)
+    if ((!trimmed && attachedFiles.length === 0) || disabled) return
+
+    let content = trimmed
+    if (attachedFiles.length > 0) {
+      const fileList = attachedFiles.map((f) => `📎 ${f.name} → ${f.virtualPath}`).join("\n")
+      content = trimmed ? `${trimmed}\n\n${fileList}` : fileList
+    }
+
+    onSend(content, effort, model)
     setValue("")
+    setAttachedFiles([])
     if (textareaRef.current) textareaRef.current.style.height = "auto"
   }
 
@@ -98,6 +116,48 @@ export function ChatInput({ onSend, disabled }: Props) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       submit()
+    }
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+
+    let tid = threadId
+    if (!tid) {
+      if (!onCreateConversation) return
+      tid = await onCreateConversation()
+    }
+
+    setUploading(true)
+    try {
+      const uploaded: AttachedFile[] = []
+      for (const file of files) {
+        const form = new FormData()
+        form.append("file", file)
+        const res = await fetch(`${API_URL}/api/v1/files/upload/${tid}`, {
+          method: "POST",
+          body: form,
+        })
+        if (res.ok) {
+          const data = await res.json()
+          uploaded.push({ name: data.filename, virtualPath: data.virtual_path })
+        }
+      }
+      setAttachedFiles((prev) => [...prev, ...uploaded])
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
+  const removeFile = (idx: number) => {
+    const file = attachedFiles[idx]
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== idx))
+    if (file && threadId) {
+      fetch(`${API_URL}/api/v1/files/upload/${threadId}/${encodeURIComponent(file.name)}`, {
+        method: "DELETE",
+      }).catch(() => {})
     }
   }
 
@@ -111,11 +171,34 @@ export function ChatInput({ onSend, disabled }: Props) {
   }, [])
 
   const currentEffort = EFFORT_OPTIONS.find((o) => o.value === effort)!
+  const canSend = !disabled && (value.trim().length > 0 || attachedFiles.length > 0)
 
   return (
     <div className="px-8 pb-7 pt-3">
       <div className="max-w-3xl mx-auto">
         <div className="flex flex-col bg-white rounded-3xl px-5 py-3 shadow-sm border border-gray-100/80 gap-2">
+
+          {/* Attached file chips */}
+          {attachedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {attachedFiles.map((f, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-1.5 bg-[#EEF0FF] rounded-full px-2.5 py-1 max-w-[200px]"
+                >
+                  <File className="size-3 text-[#5661f6] shrink-0" />
+                  <span className="text-[11px] font-medium text-[#5661f6] truncate">{f.name}</span>
+                  <button
+                    onClick={() => removeFile(i)}
+                    className="text-[#5661f6] hover:text-[#4550e0] shrink-0 ml-0.5"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <textarea
             ref={textareaRef}
             rows={1}
@@ -130,6 +213,29 @@ export function ChatInput({ onSend, disabled }: Props) {
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
+              {/* File upload */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={handleFileChange}
+                disabled={uploading}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading || disabled}
+                title="Attach files"
+                className={cn(
+                  "flex items-center justify-center size-7 rounded-full transition-colors",
+                  uploading || disabled
+                    ? "text-gray-300 cursor-not-allowed"
+                    : "text-gray-400 hover:text-[#5661f6] hover:bg-[#EEF0FF]"
+                )}
+              >
+                {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Paperclip className="size-3.5" />}
+              </button>
+
               {/* Thinking effort selector */}
               <div ref={effortRef} className="relative">
                 <button
@@ -226,10 +332,10 @@ export function ChatInput({ onSend, disabled }: Props) {
 
             <button
               onClick={submit}
-              disabled={disabled || !value.trim()}
+              disabled={!canSend}
               className={cn(
                 "size-9 rounded-full flex items-center justify-center shrink-0 transition-colors",
-                disabled || !value.trim()
+                !canSend
                   ? "bg-gray-100 text-gray-300 cursor-not-allowed"
                   : "bg-[#5661f6] text-white hover:bg-[#4550e0]"
               )}
