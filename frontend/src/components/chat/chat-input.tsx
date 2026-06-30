@@ -21,48 +21,48 @@ type ModelOption = Model & {
 
 const MODELS: ModelOption[] = [
   {
-    id: "tencent/hy3-preview",
-    name: "HY3 Preview",
-    desc: "Agentic workflows, production use",
-    inputPrice: "$0.063",
-    outputPrice: "$0.21",
-    context: "256K",
+    id: "openai/gpt-5-nano",
+    name: "GPT-5 Nano",
+    desc: "Fast, cheap, vision",
+    inputPrice: "$0.05",
+    outputPrice: "$0.40",
+    context: "400K",
   },
   {
-    id: "deepseek/deepseek-v4-flash",
-    name: "DeepSeek Flash",
-    desc: "Fast MoE, 284B params, 13B active",
-    inputPrice: "$0.09",
-    outputPrice: "$0.18",
+    id: "meta-llama/llama-4-scout",
+    name: "Llama 4 Scout",
+    desc: "10M context, vision",
+    inputPrice: "$0.10",
+    outputPrice: "$0.30",
+    context: "10M",
+  },
+  {
+    id: "google/gemini-2.5-flash-lite",
+    name: "Gemini 2.5 Flash Lite",
+    desc: "Google lightweight, vision",
+    inputPrice: "$0.10",
+    outputPrice: "$0.40",
     context: "1M",
   },
   {
-    id: "openai/gpt-5.4-nano",
-    name: "GPT-5 Nano",
-    desc: "Lightweight, speed-critical tasks",
-    inputPrice: "$0.20",
-    outputPrice: "$1.25",
-    context: "400K",
+    id: "qwen/qwen3-vl-32b-instruct",
+    name: "Qwen3 VL 32B",
+    desc: "Vision specialist",
+    inputPrice: "$0.10",
+    outputPrice: "$0.42",
+    context: "262K",
   },
   {
     id: "qwen/qwen3.7-plus",
     name: "Qwen 3.7+",
-    desc: "Cost-effective, vision support",
+    desc: "High quality, vision",
     inputPrice: "$0.32",
     outputPrice: "$1.28",
     context: "1M",
   },
-  {
-    id: "deepseek/deepseek-v4-pro",
-    name: "DeepSeek Pro",
-    desc: "Large MoE, 1.6T params, 49B active",
-    inputPrice: "$0.44",
-    outputPrice: "$0.87",
-    context: "1M",
-  },
 ]
 
-const DEFAULT_MODEL = MODELS[1] // DeepSeek Flash
+const DEFAULT_MODEL = MODELS[0] // GPT-5 Nano
 
 type Props = {
   onSend: (content: string, effort: ThinkingEffort, model: Model) => void
