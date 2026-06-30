@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Download, FileText, Image, File, Sheet, Loader2 } from "lucide-react"
+import { X, Download, FileText, Image, File, Sheet, Loader2, Code2, FileCode } from "lucide-react"
 import { Message } from "@/types/chat"
 
 interface GeneratedFile {
@@ -10,12 +10,37 @@ interface GeneratedFile {
   ext: string
 }
 
+const CODE_EXTS = new Set([
+  "py", "js", "ts", "tsx", "jsx", "json", "yaml", "yml", "toml",
+  "sh", "bash", "zsh", "html", "css", "scss", "xml", "sql",
+  "rb", "go", "rs", "c", "cpp", "h", "java", "kt", "swift",
+  "php", "r", "lua", "vim", "ini", "env", "dockerfile",
+])
+
+const EXT_TO_LANG: Record<string, string> = {
+  py: "python", js: "javascript", ts: "typescript", tsx: "tsx", jsx: "jsx",
+  json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
+  sh: "bash", bash: "bash", zsh: "bash",
+  html: "html", css: "css", scss: "scss", xml: "xml", sql: "sql",
+  rb: "ruby", go: "go", rs: "rust", c: "c", cpp: "cpp", h: "c",
+  java: "java", kt: "kotlin", swift: "swift", php: "php", r: "r",
+  lua: "lua",
+}
+
 function FileIcon({ ext, className = "size-3.5" }: { ext: string; className?: string }) {
   if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext))
     return <Image className={className} />
   if (["xlsx", "xls", "csv"].includes(ext))
     return <Sheet className={className} />
-  if (["doc", "docx", "pdf", "txt"].includes(ext))
+  if (["pdf"].includes(ext))
+    return <FileText className={className} />
+  if (["doc", "docx"].includes(ext))
+    return <FileText className={className} />
+  if (ext === "md")
+    return <FileCode className={className} />
+  if (CODE_EXTS.has(ext))
+    return <Code2 className={className} />
+  if (ext === "txt")
     return <FileText className={className} />
   return <File className={className} />
 }
@@ -88,7 +113,6 @@ function XlsxPreview({ url }: { url: string }) {
           setSheets(wb.SheetNames)
           setHtml(XLSX.utils.sheet_to_html(wb.Sheets[wb.SheetNames[0]]))
           setActive(0)
-          // Store workbook for tab switching
           ;(window as unknown as Record<string, unknown>).__xlsxWb = wb
         }
       } catch {
@@ -157,6 +181,158 @@ function SvgPreview({ url, name }: { url: string; name: string }) {
   )
 }
 
+function CodePreview({ url, ext }: { url: string; ext: string }) {
+  const [code, setCode] = useState<string | null>(null)
+  const [error, setError] = useState(false)
+  const lang = EXT_TO_LANG[ext] ?? "text"
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(url)
+      .then(r => r.text())
+      .then(t => { if (!cancelled) setCode(t) })
+      .catch(() => { if (!cancelled) setError(true) })
+    return () => { cancelled = true }
+  }, [url])
+
+  if (error) return <p className="text-[13px] text-red-400">Failed to load file.</p>
+  if (code === null) return <Loader2 className="size-5 animate-spin text-[#5661f6]" />
+
+  return (
+    <div className="w-full rounded-lg overflow-hidden shadow-sm text-[12.5px]">
+      <div className="bg-[#1e1e2e] px-4 py-2 flex items-center justify-between">
+        <span className="text-[11px] text-gray-400 font-mono">{lang}</span>
+        <span className="text-[11px] text-gray-500">{code.split("\n").length} lines</span>
+      </div>
+      <SyntaxHighlighterBlock code={code} lang={lang} />
+    </div>
+  )
+}
+
+function SyntaxHighlighterBlock({ code, lang }: { code: string; lang: string }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [SH, setSH] = useState<{ Highlighter: any; style: any } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const [{ default: Highlighter }, { default: style }] = await Promise.all([
+        import("react-syntax-highlighter/dist/esm/prism-async"),
+        import("react-syntax-highlighter/dist/esm/styles/prism/one-dark"),
+      ])
+      if (!cancelled) setSH({ Highlighter, style })
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  if (!SH) return (
+    <pre className="bg-[#1e1e2e] text-gray-200 p-4 overflow-auto font-mono text-[12.5px] leading-relaxed">
+      {code}
+    </pre>
+  )
+
+  const { Highlighter, style } = SH
+  return (
+    <Highlighter
+      language={lang}
+      style={style}
+      customStyle={{ margin: 0, borderRadius: 0, fontSize: "12.5px" }}
+      showLineNumbers
+      wrapLongLines={false}
+    >
+      {code}
+    </Highlighter>
+  )
+}
+
+function TextPreview({ url }: { url: string }) {
+  const [text, setText] = useState<string | null>(null)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(url)
+      .then(r => r.text())
+      .then(t => { if (!cancelled) setText(t) })
+      .catch(() => { if (!cancelled) setError(true) })
+    return () => { cancelled = true }
+  }, [url])
+
+  if (error) return <p className="text-[13px] text-red-400">Failed to load file.</p>
+  if (text === null) return <Loader2 className="size-5 animate-spin text-[#5661f6]" />
+
+  return (
+    <pre className="w-full bg-white rounded-lg shadow-sm p-4 text-[13px] text-gray-800 font-mono leading-relaxed whitespace-pre-wrap break-words overflow-auto">
+      {text}
+    </pre>
+  )
+}
+
+function MarkdownPreview({ url }: { url: string }) {
+  const [md, setMd] = useState<string | null>(null)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(url)
+      .then(r => r.text())
+      .then(t => { if (!cancelled) setMd(t) })
+      .catch(() => { if (!cancelled) setError(true) })
+    return () => { cancelled = true }
+  }, [url])
+
+  if (error) return <p className="text-[13px] text-red-400">Failed to load file.</p>
+  if (md === null) return <Loader2 className="size-5 animate-spin text-[#5661f6]" />
+
+  return <MarkdownRenderer content={md} />
+}
+
+function MarkdownRenderer({ content }: { content: string }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [Comp, setComp] = useState<{ ReactMarkdown: any; gfm: any } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const [{ default: ReactMarkdown }, { default: gfm }] = await Promise.all([
+        import("react-markdown"),
+        import("remark-gfm"),
+      ])
+      if (!cancelled) setComp({ ReactMarkdown, gfm })
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  if (!Comp) return <Loader2 className="size-5 animate-spin text-[#5661f6]" />
+
+  const { ReactMarkdown, gfm } = Comp
+  return (
+    <div
+      className="w-full bg-white rounded-lg shadow-sm p-6 text-[13px] leading-relaxed text-gray-800
+        prose prose-sm max-w-none
+        [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-4
+        [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4
+        [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-3
+        [&_p]:mb-3
+        [&_ul]:pl-5 [&_ul]:list-disc [&_ul]:mb-3
+        [&_ol]:pl-5 [&_ol]:list-decimal [&_ol]:mb-3
+        [&_li]:mb-1
+        [&_code]:bg-gray-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-mono [&_code]:text-[12px] [&_code]:text-[#5661f6]
+        [&_pre]:bg-[#1e1e2e] [&_pre]:rounded-lg [&_pre]:p-4 [&_pre]:overflow-auto [&_pre]:mb-3
+        [&_pre_code]:bg-transparent [&_pre_code]:text-gray-200 [&_pre_code]:p-0
+        [&_blockquote]:border-l-4 [&_blockquote]:border-[#5661f6] [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-gray-600 [&_blockquote]:mb-3
+        [&_table]:w-full [&_table]:border-collapse [&_table]:mb-3
+        [&_td]:border [&_td]:border-gray-200 [&_td]:px-3 [&_td]:py-1.5
+        [&_th]:border [&_th]:border-gray-200 [&_th]:px-3 [&_th]:py-1.5 [&_th]:bg-[#F5F6FF] [&_th]:font-semibold
+        [&_hr]:border-gray-200 [&_hr]:my-4
+        [&_a]:text-[#5661f6] [&_a]:underline [&_a]:underline-offset-2
+        [&_img]:rounded-lg [&_img]:max-w-full"
+    >
+      <ReactMarkdown remarkPlugins={[gfm]}>{content}</ReactMarkdown>
+    </div>
+  )
+}
+
 // ── main panel ───────────────────────────────────────────────────────────────
 
 function PreviewPanel({ file, onClose }: { file: GeneratedFile; onClose: () => void }) {
@@ -166,6 +342,10 @@ function PreviewPanel({ file, onClose }: { file: GeneratedFile; onClose: () => v
   const isPdf = ext === "pdf"
   const isDocx = ["doc", "docx"].includes(ext)
   const isSheet = ["xlsx", "xls", "csv"].includes(ext)
+  const isCode = CODE_EXTS.has(ext)
+  const isText = ext === "txt"
+  const isMarkdown = ext === "md"
+  const hasPreview = isImage || isSvg || isPdf || isDocx || isSheet || isCode || isText || isMarkdown
 
   return (
     <div className="flex flex-col w-[480px] shrink-0 h-full bg-white border-l border-gray-200 shadow-xl">
@@ -192,11 +372,28 @@ function PreviewPanel({ file, onClose }: { file: GeneratedFile; onClose: () => v
 
       {/* Preview body */}
       <div className="flex-1 overflow-auto bg-gray-50 p-4 flex flex-col items-start">
-        {isImage && <ImagePreview url={url} name={name} />}
-        {isSvg   && <SvgPreview  url={url} name={name} />}
-        {isPdf   && <PdfPreview  url={url} name={name} />}
-        {isDocx  && <DocxPreview url={url} />}
-        {isSheet && <XlsxPreview url={url} />}
+        {isImage    && <ImagePreview    url={url} name={name} />}
+        {isSvg      && <SvgPreview      url={url} name={name} />}
+        {isPdf      && <PdfPreview      url={url} name={name} />}
+        {isDocx     && <DocxPreview     url={url} />}
+        {isSheet    && <XlsxPreview     url={url} />}
+        {isCode     && <CodePreview     url={url} ext={ext} />}
+        {isText     && <TextPreview     url={url} />}
+        {isMarkdown && <MarkdownPreview url={url} />}
+        {!hasPreview && (
+          <div className="flex flex-col items-center justify-center w-full h-full gap-3 text-gray-400">
+            <File className="size-10" />
+            <p className="text-[13px]">No preview available</p>
+            <a
+              href={url}
+              download={name}
+              className="flex items-center gap-1.5 text-[12px] text-[#5661f6] font-medium hover:opacity-70 transition-opacity"
+            >
+              <Download className="size-3.5" />
+              Download to view
+            </a>
+          </div>
+        )}
       </div>
     </div>
   )
