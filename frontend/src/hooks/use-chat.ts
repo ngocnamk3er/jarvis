@@ -158,36 +158,45 @@ export function useChat(threadId: string | null) {
 
               case "tool_start":
                 updateAssistant(assistantId, (m) => {
+                  // Promote a streaming part (same name + run_id) to running
                   const streamingIdx = m.parts.findIndex(
-                    (p) => p.type === "tool" && p.tool.name === event.name && p.tool.status === "streaming"
+                    (p) => p.type === "tool" && p.tool.name === event.name && p.tool.status === "streaming" &&
+                           (event.run_id ? p.tool.run_id === event.run_id : true)
                   )
                   if (streamingIdx !== -1) {
                     return {
                       ...m,
                       parts: m.parts.map((p, i) =>
                         i === streamingIdx
-                          ? { ...p, tool: { ...(p as { type: "tool"; tool: ToolCall }).tool, input: event.input, status: "running" as const } }
+                          ? { ...p, tool: { ...(p as { type: "tool"; tool: ToolCall }).tool, input: event.input, status: "running" as const, run_id: event.run_id } }
                           : p
                       ),
                     }
                   }
                   return {
                     ...m,
-                    parts: [...m.parts, { type: "tool" as const, tool: { name: event.name, input: event.input, status: "running" as const } }],
+                    parts: [...m.parts, { type: "tool" as const, tool: { name: event.name, input: event.input, status: "running" as const, run_id: event.run_id } }],
                   }
                 })
                 break
 
               case "tool_end":
-                updateAssistant(assistantId, (m) => ({
-                  ...m,
-                  parts: m.parts.map((p) =>
-                    p.type === "tool" && p.tool.name === event.name &&
-                    (p.tool.status === "running" || p.tool.status === "streaming")
-                      ? { ...p, tool: { ...p.tool, output: event.output, status: "done" as const } }
-                      : p
-                  ),
-                }))
+                updateAssistant(assistantId, (m) => {
+                  // Match by run_id when available; fall back to first matching running part by name
+                  let matched = false
+                  const parts = m.parts.map((p) => {
+                    if (matched || p.type !== "tool") return p
+                    const tool = p.tool
+                    const byId = event.run_id && tool.run_id === event.run_id
+                    const byName = !event.run_id && tool.name === event.name && (tool.status === "running" || tool.status === "streaming")
+                    if (byId || byName) {
+                      matched = true
+                      return { ...p, tool: { ...tool, output: event.output, status: "done" as const } }
+                    }
+                    return p
+                  })
+                  return { ...m, parts }
+                })
                 break
 
               case "viz":

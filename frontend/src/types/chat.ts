@@ -16,6 +16,7 @@ export type ToolCall = {
   input?: unknown
   output?: string
   status: ToolStatus
+  run_id?: string
 }
 
 export type MessagePart =
@@ -35,8 +36,8 @@ export type StreamEvent =
   | { type: "token"; content: string }
   | { type: "thinking_token"; content: string }
   | { type: "tool_chunk"; index: number; name: string; args_delta: string }
-  | { type: "tool_start"; name: string; input?: unknown }
-  | { type: "tool_end"; name: string; output: string }
+  | { type: "tool_start"; name: string; input?: unknown; run_id?: string }
+  | { type: "tool_end"; name: string; output: string; run_id?: string }
   | { type: "viz"; format: "mermaid" | "svg" | "html" | "webapp"; code: string; title?: string }
   | { type: "done" }
   | { type: "error"; message: string }

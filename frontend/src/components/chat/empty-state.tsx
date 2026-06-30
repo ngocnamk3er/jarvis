@@ -1,70 +1,91 @@
-import { Globe, Zap, AlertTriangle, ArrowRight } from "lucide-react"
+"use client"
 
-const CAPABILITIES = [
+import { Terminal, Globe, FileText, BarChart2, Sparkles, Code2 } from "lucide-react"
+
+const SUGGESTIONS = [
+  {
+    Icon: FileText,
+    title: "Phân tích tài liệu",
+    desc: "Đọc & tóm tắt PDF, Word, dữ liệu CSV",
+    prompt: "Hãy phân tích file tôi vừa upload và tóm tắt nội dung chính",
+  },
   {
     Icon: Globe,
-    title: "Explore",
-    desc: "Learn how to use chat ai platform for your needs",
+    title: "Tìm kiếm web",
+    desc: "Tra cứu thông tin mới nhất từ internet",
+    prompt: "Tìm kiếm thông tin mới nhất về AI năm 2025",
   },
   {
-    Icon: Zap,
-    title: "Capabilities",
-    desc: "How much capable chat.ai to full fill your needs",
+    Icon: Terminal,
+    title: "Chạy code",
+    desc: "Viết & thực thi Python, bash ngay trong chat",
+    prompt: "Viết script Python đọc file CSV và vẽ biểu đồ",
   },
   {
-    Icon: AlertTriangle,
-    title: "Limitation",
-    desc: "How much capable chat.ai to full fill your needs",
+    Icon: BarChart2,
+    title: "Tạo biểu đồ",
+    desc: "Visualize dữ liệu thành chart, diagram",
+    prompt: "Tạo biểu đồ so sánh GDP các nước Đông Nam Á 2020–2024",
   },
-]
-
-const EXAMPLES = [
-  { label: '"Explain"', desc: 'Quantum computing in simple terms' },
-  { label: '"How to"', desc: "Make a search engine platform like google" },
-  { label: '"Remember"', desc: 'Quantum computing in simple terms' },
-  { label: '"Allows"', desc: "User to provide follow-up corrections" },
-  { label: '"May"', desc: "Occasionally generate incorrect information" },
-  { label: '"Limited"', desc: "Knowledge of world and events after 2021" },
+  {
+    Icon: Code2,
+    title: "Xây dựng webapp",
+    desc: "Tạo mini app, game chạy thẳng trong chat",
+    prompt: "Tạo một app tính lãi suất kép tương tác",
+  },
+  {
+    Icon: Sparkles,
+    title: "Giải thích khái niệm",
+    desc: "Giải thích bất kỳ chủ đề nào dễ hiểu",
+    prompt: "Giải thích Transformer architecture bằng ví dụ đơn giản",
+  },
 ]
 
 export function EmptyState({ onSend }: { onSend: (text: string) => void }) {
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
+
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-10 py-10 overflow-y-auto">
-      <p className="text-[10px] font-bold tracking-[0.3em] text-gray-400 mb-3 uppercase">
+    <div className="flex-1 flex flex-col items-center justify-center px-8 py-10 overflow-y-auto">
+
+      {/* Logo mark */}
+      <div className="relative mb-6">
+        <div className="size-14 rounded-2xl bg-[#5661f6] flex items-center justify-center shadow-lg shadow-[#5661f6]/25">
+          <span className="text-white font-bold text-2xl tracking-tight">J</span>
+        </div>
+        <div className="absolute -inset-1 rounded-2xl bg-[#5661f6]/10 -z-10 blur-md" />
+      </div>
+
+      {/* Greeting */}
+      <p className="text-[11px] font-semibold tracking-[0.2em] text-[#5661f6]/60 uppercase mb-2">
         Jarvis
       </p>
-      <h2 className="text-[28px] font-bold text-gray-900 mb-10 text-center leading-tight tracking-tight">
-        Good day! How may I assist you today?
+      <h2 className="text-[26px] font-bold text-gray-900 mb-1 text-center leading-tight tracking-tight">
+        {greeting}
       </h2>
+      <p className="text-[14px] text-gray-400 mb-9 text-center">
+        Tôi có thể giúp gì cho bạn hôm nay?
+      </p>
 
-      <div className="flex gap-3 w-full max-w-[680px]">
-        {/* Dark capability cards */}
-        <div className="flex flex-col gap-3 w-[160px] shrink-0">
-          {CAPABILITIES.map(({ Icon, title, desc }) => (
-            <div key={title} className="bg-gray-900 text-white rounded-2xl p-4">
-              <Icon className="size-4 mb-2.5 opacity-80" />
-              <p className="text-[13px] font-semibold mb-1 leading-[18px]">{title}</p>
-              <p className="text-[11px] text-gray-400 leading-[16px]">{desc}</p>
+      {/* Suggestion cards */}
+      <div className="grid grid-cols-3 gap-3 w-full max-w-[680px]">
+        {SUGGESTIONS.map(({ Icon, title, desc, prompt }) => (
+          <button
+            key={title}
+            onClick={() => onSend(prompt)}
+            className="group bg-white hover:bg-[#5661f6] rounded-2xl p-4 text-left shadow-sm border border-gray-100/80 hover:border-[#5661f6] hover:shadow-lg hover:shadow-[#5661f6]/15 transition-all duration-200"
+          >
+            <div className="size-8 rounded-xl bg-[#EEF0FF] group-hover:bg-white/20 flex items-center justify-center mb-3 transition-colors">
+              <Icon className="size-4 text-[#5661f6] group-hover:text-white transition-colors" />
             </div>
-          ))}
-        </div>
-
-        {/* Example prompt cards */}
-        <div className="flex-1 grid grid-cols-2 gap-3">
-          {EXAMPLES.map(({ label, desc }) => (
-            <button
-              key={label}
-              onClick={() => onSend(desc)}
-              className="bg-white rounded-2xl p-4 text-left hover:shadow-md transition-all shadow-sm flex flex-col justify-between group min-h-[86px]"
-            >
-              <div>
-                <p className="text-[13px] font-semibold text-gray-900 mb-1 leading-[18px]">{label}</p>
-                <p className="text-[11px] text-gray-500 leading-[16px]">{desc}</p>
-              </div>
-              <ArrowRight className="size-3.5 text-gray-300 group-hover:text-[#5661f6] mt-2 transition-colors self-end" />
-            </button>
-          ))}
-        </div>
+            <p className="text-[12px] font-semibold text-gray-800 group-hover:text-white mb-1 leading-[17px] transition-colors">
+              {title}
+            </p>
+            <p className="text-[11px] text-gray-400 group-hover:text-white/70 leading-[15px] transition-colors">
+              {desc}
+            </p>
+          </button>
+        ))}
       </div>
     </div>
   )
