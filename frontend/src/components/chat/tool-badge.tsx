@@ -1,13 +1,33 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronDown, ChevronRight, Download, Loader2, Wrench } from "lucide-react"
+import {
+  ChevronDown, ChevronRight, Download, Loader2,
+  Terminal, FileDown, Globe, Hash, Clock, Wrench,
+} from "lucide-react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { ToolCall } from "@/types/chat"
+import type { LucideIcon } from "lucide-react"
 
+// ── Per-tool display metadata ──────────────────────────────────────────────
+type ToolMeta = { label: string; Icon: LucideIcon }
+
+const TOOL_META: Record<string, ToolMeta> = {
+  bash:             { label: "Running command",    Icon: Terminal  },
+  represent_file:   { label: "Exporting file",     Icon: FileDown  },
+  web_search:       { label: "Searching the web",  Icon: Globe     },
+  calculator:       { label: "Calculating",         Icon: Hash      },
+  get_current_time: { label: "Getting time",        Icon: Clock     },
+}
+
+function getMeta(name: string): ToolMeta {
+  return TOOL_META[name] ?? { label: name, Icon: Wrench }
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────────
 const LANG_MAP: Record<string, string> = {
   code: "python",
   expression: "text",
@@ -101,45 +121,33 @@ function OutputBlock({ output }: { output: string }) {
   )
 }
 
-function StreamingArgsPreview({ argsStr }: { argsStr: string }) {
-  // Try to extract a readable value from partial JSON
-  const preview = argsStr.replace(/^\{?"?\w+"?\s*:\s*"?/, "").slice(0, 80)
-  return (
-    <span className="text-[11px] text-gray-400 font-mono truncate max-w-[240px] inline-flex items-center gap-0.5">
-      <span className="opacity-70">{preview}</span>
-      <span className="inline-block w-[2px] h-[12px] bg-[#5661f6] animate-pulse rounded-sm align-middle ml-0.5" />
-    </span>
-  )
-}
-
+// ── Badge ──────────────────────────────────────────────────────────────────
 export function ToolBadge({ tool, autoCollapsed }: { tool: ToolCall; autoCollapsed?: boolean }) {
   const [open, setOpen] = useState(!autoCollapsed)
+  const { label, Icon } = getMeta(tool.name)
 
   useEffect(() => {
     if (autoCollapsed) setOpen(false)
   }, [autoCollapsed])
 
-  // Streaming args — show tool name + partial args with cursor
+  // Streaming — tool name resolves before args arrive
   if (tool.status === "streaming") {
     return (
-      <div className="flex items-center gap-2 py-1 flex-wrap">
-        <Wrench className="size-3 text-[#5661f6] animate-pulse shrink-0" />
-        <span className="text-[12px] font-semibold text-gray-600 font-mono">{tool.name}</span>
-        <span className="text-[11px] text-gray-400">(</span>
-        <StreamingArgsPreview argsStr={tool.argsStr ?? ""} />
-        <span className="text-[11px] text-gray-400">)</span>
+      <div className="flex items-center gap-1.5 py-1">
+        <Icon className="size-3 text-[#5661f6] animate-pulse shrink-0" />
+        <span className="text-[12px] font-medium text-gray-500">{label}</span>
+        <span className="inline-block w-[2px] h-[12px] bg-[#5661f6] animate-pulse rounded-sm align-middle" />
       </div>
     )
   }
 
-  // Running — show input expanded so user sees what's executing
+  // Running — spinner + label
   if (tool.status === "running") {
     return (
       <div className="py-1">
         <div className="flex items-center gap-1.5 mb-2">
-          <Loader2 className="size-3 animate-spin text-[#5661f6]" />
-          <span className="text-[12px] font-semibold text-[#5661f6] font-mono">{tool.name}</span>
-          <span className="text-[11px] text-gray-400">running…</span>
+          <Loader2 className="size-3 animate-spin text-[#5661f6] shrink-0" />
+          <span className="text-[12px] font-medium text-[#5661f6]">{label}</span>
         </div>
         {tool.input !== undefined && (
           <div className="ml-1 border-l-2 border-[#E0E7FF] pl-3.5">
@@ -150,18 +158,18 @@ export function ToolBadge({ tool, autoCollapsed }: { tool: ToolCall; autoCollaps
     )
   }
 
-  // Done — collapsible with input + output
+  // Done — collapsible
   return (
     <div className="py-1">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+        className="flex items-center gap-1.5 hover:opacity-75 transition-opacity"
       >
-        <Wrench className="size-3 text-[#5661f6]" />
-        <span className="text-[12px] font-semibold text-gray-600 font-mono">{tool.name}</span>
+        <Icon className="size-3 text-[#5661f6] shrink-0" />
+        <span className="text-[12px] font-medium text-gray-500">{label}</span>
         {open
-          ? <ChevronDown className="size-3 text-gray-400" />
-          : <ChevronRight className="size-3 text-gray-400" />
+          ? <ChevronDown className="size-3 text-gray-300" />
+          : <ChevronRight className="size-3 text-gray-300" />
         }
       </button>
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
-import { Copy, Check, Brain, ChevronDown, BarChart2, Clapperboard } from "lucide-react"
+import { Copy, Check, Brain, ChevronDown, BarChart2, Clapperboard, Globe } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
@@ -24,6 +24,11 @@ const SvgDiagram = dynamic(
 const AnimationBlock = dynamic(
   () => import("./animation-block").then((m) => m.AnimationBlock),
   { ssr: false, loading: () => <div className="my-3 h-[400px] rounded-xl bg-gray-50 animate-pulse" /> }
+)
+
+const WebAppBlock = dynamic(
+  () => import("./webapp-block").then((m) => m.WebAppBlock),
+  { ssr: false, loading: () => <div className="my-3 h-[480px] rounded-xl bg-gray-50 animate-pulse" /> }
 )
 
 function ThinkingBlock({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
@@ -132,23 +137,33 @@ export function MessageItem({
 
           if (part.type === "viz") {
             const isAnim = part.format === "html"
+            const isWebApp = part.format === "webapp"
+            const icon = isWebApp
+              ? <Globe className="size-3 text-[#5661f6] shrink-0" />
+              : isAnim
+                ? <Clapperboard className="size-3 text-[#5661f6] shrink-0" />
+                : <BarChart2 className="size-3 text-[#5661f6] shrink-0" />
+            const label = isWebApp
+              ? "generate_webapp"
+              : isAnim
+                ? "generate_animation"
+                : part.format === "svg"
+                  ? "generate_visualization_svg"
+                  : "generate_visualization_mermaid"
             return (
               <div key={i} className="py-1">
                 <div className="flex items-center gap-1.5 mb-2">
-                  {isAnim
-                    ? <Clapperboard className="size-3 text-[#5661f6] shrink-0" />
-                    : <BarChart2 className="size-3 text-[#5661f6] shrink-0" />
-                  }
-                  <span className="text-[12px] font-semibold text-gray-600 font-mono">
-                    {isAnim ? "generate_animation" : part.format === "svg" ? "generate_visualization_svg" : "generate_visualization_mermaid"}
-                  </span>
+                  {icon}
+                  <span className="text-[12px] font-semibold text-gray-600 font-mono">{label}</span>
                 </div>
                 <div className="ml-1 border-l-2 border-[#E0E7FF] pl-3.5">
-                  {isAnim
-                    ? <AnimationBlock html={part.code} title={part.title} />
-                    : part.format === "svg"
-                      ? <SvgDiagram code={part.code} title={part.title} />
-                      : <MermaidDiagram code={part.code} title={part.title} />
+                  {isWebApp
+                    ? <WebAppBlock html={part.code} title={part.title} />
+                    : isAnim
+                      ? <AnimationBlock html={part.code} title={part.title} />
+                      : part.format === "svg"
+                        ? <SvgDiagram code={part.code} title={part.title} />
+                        : <MermaidDiagram code={part.code} title={part.title} />
                   }
                 </div>
               </div>
