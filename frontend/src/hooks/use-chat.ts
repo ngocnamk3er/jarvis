@@ -164,7 +164,12 @@ export function useChat(threadId: string | null) {
                   const byName = !event.run_id && tool.name === event.name && (tool.status === "running" || tool.status === "streaming")
                   if (byId || byName) {
                     matched = true
-                    return { ...p, tool: { ...tool, output: event.output, status: "done" as const } }
+                    // If tool_start never fired (e.g. blocked by limit middleware), recover label from argsStr
+                    let label = tool.label
+                    if (!label && tool.argsStr) {
+                      try { label = JSON.parse(tool.argsStr).label } catch { /* ignore */ }
+                    }
+                    return { ...p, tool: { ...tool, label, output: event.output, status: "done" as const } }
                   }
                   return p
                 })

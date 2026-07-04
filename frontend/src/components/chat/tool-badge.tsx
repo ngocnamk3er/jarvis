@@ -52,7 +52,7 @@ function InputBlock({ input }: { input: unknown }) {
               {key}
             </span>
             {isMultiline ? (
-              <div className="rounded-xl overflow-hidden border border-gray-100 text-[12px]">
+              <div className="rounded-xl overflow-hidden border border-gray-100 text-[12px]" style={{ maxHeight: "200px", overflowY: "auto" }}>
                 <SyntaxHighlighter
                   language={lang}
                   style={oneLight}
@@ -103,11 +103,12 @@ function OutputBlock({ output }: { output: string }) {
   return (
     <div>
       <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">output</span>
-      <div className="bg-[#F0F4FF] rounded-xl px-4 py-3 border border-[#E0E7FF] text-[12px] leading-[18px] text-gray-700
+      <div className="bg-[#F0F4FF] rounded-xl px-4 py-3 border border-[#E0E7FF] text-[12px] leading-[18px] text-gray-700 overflow-y-auto
         [&_p]:mb-2 [&_p:last-child]:mb-0
         [&_strong]:font-semibold [&_strong]:text-gray-800
         [&_ul]:pl-4 [&_ul]:my-1 [&_li]:my-0.5
-        [&_hr]:border-[#E0E7FF] [&_hr]:my-2">
+        [&_hr]:border-[#E0E7FF] [&_hr]:my-2"
+        style={{ maxHeight: "300px" }}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
