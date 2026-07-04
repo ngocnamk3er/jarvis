@@ -127,7 +127,8 @@ function OutputBlock({ output }: { output: string }) {
 // ── Badge ──────────────────────────────────────────────────────────────────
 export function ToolBadge({ tool, autoCollapsed }: { tool: ToolCall; autoCollapsed?: boolean }) {
   const [open, setOpen] = useState(!autoCollapsed)
-  const { label, Icon } = getMeta(tool.name)
+  const { label: metaLabel, Icon } = getMeta(tool.name)
+  const label = tool.label || metaLabel
 
   useEffect(() => {
     if (autoCollapsed) setOpen(false)

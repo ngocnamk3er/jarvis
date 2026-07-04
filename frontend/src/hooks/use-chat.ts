@@ -142,14 +142,14 @@ export function useChat(threadId: string | null) {
                     ...m,
                     parts: m.parts.map((p, i) =>
                       i === streamingIdx
-                        ? { ...p, tool: { ...(p as { type: "tool"; tool: ToolCall }).tool, input: event.input, status: "running" as const, run_id: event.run_id } }
+                        ? { ...p, tool: { ...(p as { type: "tool"; tool: ToolCall }).tool, label: event.label, input: event.input, status: "running" as const, run_id: event.run_id } }
                         : p
                     ),
                   }
                 }
                 return {
                   ...m,
-                  parts: [...m.parts, { type: "tool" as const, tool: { name: event.name, input: event.input, status: "running" as const, run_id: event.run_id } }],
+                  parts: [...m.parts, { type: "tool" as const, tool: { name: event.name, label: event.label, input: event.input, status: "running" as const, run_id: event.run_id } }],
                 }
               })
               break
