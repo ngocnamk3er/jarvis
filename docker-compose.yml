@@ -36,3 +36,4 @@ volumes:
   postgres_data:
   minio_data:
   jarvis-pip-cache:
+  jarvis-uv-cache:

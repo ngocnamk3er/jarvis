@@ -158,10 +158,12 @@ export function useChat(threadId: string | null) {
 
               case "tool_start":
                 updateAssistant(assistantId, (m) => {
-                  // Promote a streaming part (same name + run_id) to running
+                  // Promote a streaming part to running.
+                  // Streaming parts have no run_id yet (tool_chunk doesn't carry one),
+                  // so match by name when run_id is absent on the part.
                   const streamingIdx = m.parts.findIndex(
                     (p) => p.type === "tool" && p.tool.name === event.name && p.tool.status === "streaming" &&
-                           (event.run_id ? p.tool.run_id === event.run_id : true)
+                           (!p.tool.run_id || p.tool.run_id === event.run_id)
                   )
                   if (streamingIdx !== -1) {
                     return {
