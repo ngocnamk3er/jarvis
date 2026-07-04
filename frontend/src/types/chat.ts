@@ -32,6 +32,22 @@ export type Message = {
   isStreaming: boolean
 }
 
+export type HitlAction = {
+  name: string
+  args: Record<string, unknown>
+  description: string
+}
+
+export type HitlReviewConfig = {
+  action_name: string
+  allowed_decisions: string[]
+}
+
+export type PendingHitl = {
+  actions: HitlAction[]
+  review_configs: HitlReviewConfig[]
+}
+
 export type StreamEvent =
   | { type: "token"; content: string }
   | { type: "thinking_token"; content: string }
@@ -39,6 +55,7 @@ export type StreamEvent =
   | { type: "tool_start"; name: string; input?: unknown; run_id?: string }
   | { type: "tool_end"; name: string; output: string; run_id?: string }
   | { type: "viz"; format: "mermaid" | "svg" | "html" | "webapp"; code: string; title?: string }
+  | { type: "hitl_request"; actions: HitlAction[]; review_configs: HitlReviewConfig[] }
   | { type: "done" }
   | { type: "error"; message: string }
 

@@ -10,6 +10,7 @@ import { EmptyState } from "./empty-state"
 import { MessageList } from "./message-list"
 import { ChatInput } from "./chat-input"
 import { PreviewPanel, GeneratedFile } from "./file-tray"
+import { HitlApproval } from "./hitl-approval"
 
 export function ChatWindow() {
   const router = useRouter()
@@ -20,7 +21,7 @@ export function ChatWindow() {
   const [interrupted, setInterrupted] = useState(false)
   const pendingContent = useRef<{ content: string; effort: import("@/types/chat").ThinkingEffort } | null>(null)
 
-  const { messages, isLoading, sendMessage, clearMessages, loadHistory } = useChat(activeId)
+  const { messages, isLoading, pendingHitl, sendMessage, resumeMessage, clearMessages, loadHistory } = useChat(activeId)
   const [previewFile, setPreviewFile] = useState<GeneratedFile | null>(null)
 
   async function openConversation(id: string) {
@@ -109,7 +110,15 @@ export function ChatWindow() {
             <EmptyState onSend={handleSend} />
           )}
 
-          {interrupted && !isLoading && (
+          {pendingHitl && !isLoading && (
+            <HitlApproval
+              hitl={pendingHitl}
+              onApprove={() => resumeMessage("approve")}
+              onReject={() => resumeMessage("reject")}
+            />
+          )}
+
+          {interrupted && !isLoading && !pendingHitl && (
             <div className="flex justify-center pb-2">
               <div className="flex items-center gap-2.5 bg-white border border-amber-200 text-amber-700 rounded-full px-4 py-2 text-[12px] shadow-sm">
                 <span>Response was interrupted</span>
@@ -126,7 +135,7 @@ export function ChatWindow() {
 
           <ChatInput
             onSend={handleSend}
-            disabled={isLoading}
+            disabled={isLoading || !!pendingHitl}
             threadId={activeId}
             onCreateConversation={async () => {
               const conv = await create("New conversation")
