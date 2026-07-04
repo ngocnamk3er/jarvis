@@ -97,6 +97,9 @@ function OutputBlock({ output }: { output: string }) {
       </div>
     )
   }
+  // Two trailing spaces before each newline = GFM hard line break,
+  // so terminal output (ls, pip list, etc.) renders with proper line breaks.
+  const rendered = text.replace(/\n/g, "  \n")
   return (
     <div>
       <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">output</span>
@@ -114,7 +117,7 @@ function OutputBlock({ output }: { output: string }) {
                 : <a href={href} className="text-[#5661f6] underline break-all" target="_blank" rel="noreferrer">{children}</a>,
           }}
         >
-          {text}
+          {rendered}
         </ReactMarkdown>
       </div>
     </div>
