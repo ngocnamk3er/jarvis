@@ -119,11 +119,9 @@ Config: 200 users, ramp 10/s, 120s, async endpoint + sync tools
 
 | Endpoint | Requests | Median | P95 | P99 | Max | RPS |
 |---|---|---|---|---|---|---|
-| /chat/stream | 60 | 10s | 53s | 117s | 117s | 0.50 |
-| /chat/resume | 5 | 5s | 12s | 12s | 12s | 0.04 |
-| **Aggregated** | **65** | **10s** | **38s** | **117s** | **117s** | **0.54** |
-
-CPU avg: 1.0% | RAM peak: 102MB
+| /chat/stream | 558 | 24s | 49s | 65s | 89s | 4.70 |
+| /chat/resume | 188 | 19s | 28s | 32s | 32s | 1.58 |
+| **Aggregated** | **746** | **21s** | **47s** | **59s** | **89s** | **6.28** |
 
 ---
 
@@ -133,11 +131,9 @@ Config: 200 users, ramp 10/s, 120s, sync endpoint (run_coroutine_threadsafe, any
 
 | Endpoint | Requests | Median | P95 | P99 | Max | RPS |
 |---|---|---|---|---|---|---|
-| /chat/stream | 208 | 102s | 111s | 112s | 113s | 1.73 |
-| /chat/resume | 12 | 110s | 112s | 112s | 112s | 0.10 |
-| **Aggregated** | **220** | **103s** | **111s** | **112s** | **113s** | **1.83** |
-
-CPU avg: 0.9% | RAM peak: 97MB
+| /chat/stream | 184 | 56s | 102s | 110s | 112s | 1.60 |
+| /chat/resume | 93 | 13s | 34s | 68s | 68s | 0.81 |
+| **Aggregated** | **277** | **39s** | **100s** | **110s** | **112s** | **2.40** |
 
 ---
 
@@ -145,89 +141,23 @@ CPU avg: 0.9% | RAM peak: 97MB
 
 | Metric | Async endpoint | Sync endpoint |
 |---|---|---|
-| Median | **10s** ✅ | 103s |
-| P95 | **38s** ✅ | 111s |
-| P99 | 117s | **112s** ✅ |
-| RPS | 0.54 | **1.83** ✅ |
-| Requests completed | 65 | **220** ✅ |
-| CPU avg | 1.0% | 0.9% |
-| RAM peak | **102MB** | 97MB |
+| Median | **21s** ✅ | 39s |
+| P95 | **47s** ✅ | 100s |
+| P99 | **59s** ✅ | 110s |
+| RPS | **6.28** ✅ | 2.40 |
+| Requests completed | **746** ✅ | 277 |
 
-### Why async median (10s) << sync median (103s)
+### Nhận xét
 
-Sync — Little's Law: `W = L/λ = 200/1.83 ≈ 109s`. Thread pool = 40 → 160 queue → mọi request (kể cả nhẹ) đợi ~80s trước khi chạy.
+**Async thắng toàn diện ở 200 users** — khác với kết quả cũ (Round 5/6 trước). Lý do kết quả cũ sai lệch:
 
-Async — task distribution: 55% requests là lightweight (simple_qa, get_time, mermaid), không có queue, start ngay → hoàn thành 3-5s → kéo median xuống 10s.
+- Round 5 cũ chỉ đo **65 req** vì locustfile cũ dùng `HttpUser.client` không đọc SSE đúng → Locust không send request mới trong khi chờ → throughput bị đo thấp giả tạo.
+- Locustfile mới dùng raw `requests.post()` → measure đúng → **746 req**, RPS 6.28.
 
-### Why async P99 (117s) > sync P99 (112s)
-
-Event loop starvation: 200 coroutines cạnh tranh single-threaded event loop → một số coroutine bị scheduler bỏ qua → outlier latency cao hơn. Sync FIFO queue có upper bound dự đoán được: max_queue_wait + max_task_time ≈ 112s.
-
-### Why sync RPS (1.83) > async RPS (0.54)
-
-Async overloaded ở 200 users: 200 LangGraph states đồng thời → scheduling overhead tăng → throughput giảm. Sync giới hạn 40 active requests → overhead thấp hơn mỗi request.
-
-### Where do 200 async connections live?
-
-Mỗi connection = 1 Python coroutine object (~few KB), treo tại `await`. Không cần thread.
-Giới hạn thực tế: RAM (102MB cho 200 LangGraph states) và event loop scheduling (~1% CPU), không phải file descriptors hay connections.
-
----
-
-## Round 7 — Connections/Threads/FDs measurement (200 users, LLM cache warm)
-
-Đo trực tiếp `threads`, `file descriptors`, `TCP connections` trong lúc load test chạy.
-
-### Async endpoint
-
-```bash
-ss -tn state established '( dport = :8000 or sport = :8000 )' | wc -l
-cat /proc/<pid>/status | grep Threads
-```
-
-| Time | Threads | FDs | Connections |
-|---|---|---|---|
-| Baseline | 2 | 12 | 1 |
-| Ramp up | 2 | 12 | ~160 |
-| **Peak (steady)** | **2** | **12** | **401** |
-| After test | 2 | 12 | 1 |
-
-RPS: ~0.54 | Median: 10s
-
-### Sync endpoint (run_coroutine_threadsafe, cache warm)
-
-| Time | Threads | FDs | Connections |
-|---|---|---|---|
-| Baseline | 2 | 12 | 1 |
-| **Peak (steady)** | **2** | **12** | **4** |
-| After test | 2 | 12 | 1 |
-
-RPS: ~100 | Median: **5ms**
-
-### Key findings
-
-**1. Async giữ 401 connections đồng thời, sync chỉ giữ 4**
-
-Async SSE stream từng token → connection mở suốt 10-60s → 200 users = 401 connections đồng thời.
-Sync collect-then-return → gửi tất cả trong <10ms → connection đóng ngay → không bao giờ tích lũy connections.
-
-**2. Threads luôn = 2 trong cả 2 trường hợp**
-
-Uvicorn chỉ dùng 2 threads (main + reloader). Với async endpoint, 401 connections không cần thêm thread nào.
-Với sync endpoint, anyio thread pool được tạo on-demand và không visible qua `/proc/pid/status` threads
-(anyio quản lý worker threads riêng).
-
-**3. Sync median 5ms (cache warm) vs 103s (cache cold)**
-
-⚠️ **Cache state là confounding variable quan trọng.** Round 6 (cache cold) cho median 103s, Round 7
-(cache warm sau nhiều test) cho median 5ms. Simple_qa/get_time tasks chỉ cần SQLite lookup → ~1ms.
-Kết quả chỉ so sánh được khi cache state giống nhau.
-
-**4. Sync endpoint không streaming thật sự**
-
-Sync collect all chunks trước → user không thấy token nào cho đến khi response hoàn thành.
-Async stream từng token ngay khi LLM generate → UX tốt hơn nhiều dù latency tương đương.
-Đây là lý do chính để dùng async endpoint, không phải performance.
+Sync collect-then-return bị bottleneck bởi **anyio thread pool (40 threads)**:
+- 200 users → 160 request phải queue chờ thread
+- Little's Law: `W = L/λ = 200/2.40 ≈ 83s` → median 39s hợp lý
+- P99 = 110s = thời gian tối đa phải đợi trong queue + xử lý
 
 ---
 
