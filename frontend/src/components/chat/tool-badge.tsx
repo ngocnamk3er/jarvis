@@ -137,30 +137,28 @@ export function ToolGroupBadge({ tools, autoCollapsed }: { tools: ToolCall[]; au
 
   const allDone = tools.every((t) => t.status === "done")
   const anyRunning = tools.some((t) => t.status === "running" || t.status === "streaming")
-  const n = tools.length
 
-  const headerLabel = allDone
-    ? `${n} tools`
-    : anyRunning
-      ? `Running ${n} tools…`
-      : `${n} tools`
+  const labels = tools.map((t) => t.label || getMeta(t.name).label).filter(Boolean)
+  const headerLabel = labels.length > 0
+    ? labels.join("  ·  ")
+    : `${tools.length} tools`
 
   return (
     <div className="py-1">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 hover:opacity-75 transition-opacity"
+        className="flex items-center gap-1.5 hover:opacity-75 transition-opacity max-w-full"
       >
         {anyRunning
           ? <Loader2 className="size-3 animate-spin text-[#5661f6] shrink-0" />
           : <Layers className="size-3 text-[#5661f6] shrink-0" />
         }
-        <span className={`text-[12px] font-medium ${anyRunning ? "text-[#5661f6]" : "text-gray-500"}`}>
+        <span className={`text-[12px] font-medium truncate ${anyRunning ? "text-[#5661f6]" : "text-gray-500"}`}>
           {headerLabel}
         </span>
         {allDone && (open
-          ? <ChevronDown className="size-3 text-gray-300" />
-          : <ChevronRight className="size-3 text-gray-300" />
+          ? <ChevronDown className="size-3 text-gray-300 shrink-0" />
+          : <ChevronRight className="size-3 text-gray-300 shrink-0" />
         )}
       </button>
 
