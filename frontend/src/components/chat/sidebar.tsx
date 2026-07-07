@@ -7,12 +7,22 @@ import { Conversation } from "@/types/chat"
 type Props = {
   conversations: Conversation[]
   activeId: string | null
+  loadingThreadIds: ReadonlySet<string>
   onNewChat: () => void
   onSelect: (id: string) => void
   onDelete: (id: string) => void
 }
 
-export function Sidebar({ conversations, activeId, onNewChat, onSelect, onDelete }: Props) {
+function SpinnerIcon({ className }: { className?: string }) {
+  return (
+    <svg className={cn("animate-spin", className)} viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+      <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  )
+}
+
+export function Sidebar({ conversations, activeId, loadingThreadIds, onNewChat, onSelect, onDelete }: Props) {
   return (
     <aside className="w-[220px] bg-white flex flex-col h-full shrink-0 border-r border-gray-100">
       <div className="px-5 pt-7 pb-4">
@@ -39,28 +49,34 @@ export function Sidebar({ conversations, activeId, onNewChat, onSelect, onDelete
               <span className="text-[11px] font-medium text-gray-400 tracking-wide">Conversations</span>
             </div>
             <ul>
-              {conversations.map((conv) => (
-                <li key={conv.id} className="group relative">
-                  <button
-                    onClick={() => onSelect(conv.id)}
-                    className={cn(
-                      "w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-xl text-[13px] font-medium transition-colors pr-7",
-                      conv.id === activeId
-                        ? "bg-[#EEF0FF] text-[#5661f6]"
-                        : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
-                    )}
-                  >
-                    <MessageSquare className="size-3 shrink-0 opacity-60" />
-                    <span className="truncate leading-[18px]">{conv.title}</span>
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onDelete(conv.id) }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:text-red-500 text-gray-400"
-                  >
-                    <Trash2 className="size-3" />
-                  </button>
-                </li>
-              ))}
+              {conversations.map((conv) => {
+                const isLoading = loadingThreadIds.has(conv.id)
+                return (
+                  <li key={conv.id} className="group relative">
+                    <button
+                      onClick={() => onSelect(conv.id)}
+                      className={cn(
+                        "w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-xl text-[13px] font-medium transition-colors pr-7",
+                        conv.id === activeId
+                          ? "bg-[#EEF0FF] text-[#5661f6]"
+                          : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                      )}
+                    >
+                      {isLoading
+                        ? <SpinnerIcon className={cn("size-3 shrink-0", conv.id === activeId ? "text-[#5661f6]" : "text-gray-400")} />
+                        : <MessageSquare className="size-3 shrink-0 opacity-60" />
+                      }
+                      <span className="truncate leading-[18px]">{conv.title}</span>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDelete(conv.id) }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:text-red-500 text-gray-400"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
           </>
         )}

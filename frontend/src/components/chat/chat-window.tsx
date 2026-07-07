@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { RotateCcw } from "lucide-react"
-import { useChat } from "@/hooks/use-chat"
+import { useChat, useLoadingThreadIds } from "@/hooks/use-chat"
 import { useConversations } from "@/hooks/use-conversations"
 import { Sidebar } from "./sidebar"
 import { EmptyState } from "./empty-state"
@@ -12,21 +12,27 @@ import { ChatInput } from "./chat-input"
 import { PreviewPanel, GeneratedFile } from "./file-tray"
 import { HitlApproval } from "./hitl-approval"
 
+// Module-level set to track which threads have already had history loaded
+// (avoids re-fetching when switching back to a conversation mid-stream)
+const _historyLoaded = new Set<string>()
+
 export function ChatWindow() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
   const { conversations, create, remove } = useConversations()
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [interrupted, setInterrupted] = useState(false)
   const pendingContent = useRef<{ content: string; effort: import("@/types/chat").ThinkingEffort } | null>(null)
 
-  const { messages, isLoading, pendingHitl, sendMessage, resumeMessage, clearMessages, loadHistory } = useChat(activeId)
+  const { messages, isLoading, pendingHitl, interrupted, sendMessage, resumeMessage, clearThread, loadHistory } = useChat(activeId)
+  const loadingThreadIds = useLoadingThreadIds()
   const [previewFile, setPreviewFile] = useState<GeneratedFile | null>(null)
 
   async function openConversation(id: string) {
-    const isPending = await loadHistory(id)
-    setInterrupted(isPending)
+    // Skip if already loaded (may be mid-stream when switching back)
+    if (_historyLoaded.has(id)) return
+    _historyLoaded.add(id)
+    await loadHistory(id)
   }
 
   // Restore active conversation from URL on mount
@@ -49,13 +55,11 @@ export function ChatWindow() {
 
   function activate(id: string | null) {
     setActiveId(id)
-    setInterrupted(false)
     router.replace(id ? `/?c=${id}` : "/")
   }
 
   const handleNewChat = () => {
     activate(null)
-    clearMessages()
   }
 
   const handleSelectConversation = async (id: string) => {
@@ -65,24 +69,23 @@ export function ChatWindow() {
 
   const handleDeleteConversation = async (id: string) => {
     await remove(id)
+    _historyLoaded.delete(id)
     if (activeId === id) {
       activate(null)
-      clearMessages()
     }
   }
 
   const handleSend = async (content: string, effort: import("@/types/chat").ThinkingEffort = "high", model?: import("@/types/chat").Model) => {
-    setInterrupted(false)
     if (!activeId) {
       pendingContent.current = { content, effort }
       const conv = await create(content.slice(0, 50))
+      _historyLoaded.add(conv.id)  // Mark as loaded so we don't fetch history for brand-new thread
       activate(conv.id)
     } else {
       sendMessage(content, effort, model)
     }
   }
 
-  // Retry: find last user message and re-send
   const handleRetry = () => {
     const lastUser = [...messages].reverse().find((m) => m.role === "user")
     if (!lastUser) return
@@ -97,6 +100,7 @@ export function ChatWindow() {
       <Sidebar
         conversations={conversations}
         activeId={activeId}
+        loadingThreadIds={loadingThreadIds}
         onNewChat={handleNewChat}
         onSelect={handleSelectConversation}
         onDelete={handleDeleteConversation}
@@ -139,6 +143,7 @@ export function ChatWindow() {
             threadId={activeId}
             onCreateConversation={async () => {
               const conv = await create("New conversation")
+              _historyLoaded.add(conv.id)
               activate(conv.id)
               return conv.id
             }}

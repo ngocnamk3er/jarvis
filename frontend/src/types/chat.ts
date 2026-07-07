@@ -1,4 +1,4 @@
-export type Role = "user" | "assistant"
+export type Role = "user" | "assistant" | "system"
 
 export type ThinkingEffort = "low" | "medium" | "high" | "xhigh"
 
@@ -18,6 +18,7 @@ export type ToolCall = {
   output?: string
   status: ToolStatus
   run_id?: string
+  parent_run_id?: string
 }
 
 export type MessagePart =

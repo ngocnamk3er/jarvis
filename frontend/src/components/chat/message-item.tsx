@@ -5,10 +5,13 @@ import dynamic from "next/dynamic"
 import { Copy, Check, Brain, ChevronDown, BarChart2, Clapperboard, Globe } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import remarkMath from "remark-math"
+import rehypeKatex from "rehype-katex"
+import "katex/dist/katex.min.css"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
-import { Message } from "@/types/chat"
-import { ToolBadge } from "./tool-badge"
+import { Message, MessagePart, ToolCall } from "@/types/chat"
+import { ToolBadge, ToolGroupBadge } from "./tool-badge"
 import { extractFilesFromMessage, FileChips, GeneratedFile } from "./file-tray"
 
 const MermaidDiagram = dynamic(
@@ -30,6 +33,42 @@ const WebAppBlock = dynamic(
   () => import("./webapp-block").then((m) => m.WebAppBlock),
   { ssr: false, loading: () => <div className="my-3 h-[480px] rounded-xl bg-gray-50 animate-pulse" /> }
 )
+
+// ── Group consecutive tool parts sharing the same parent_run_id ────────────
+type NonToolPart = Exclude<MessagePart, { type: "tool" }>
+
+type RenderItem =
+  | { kind: "tool_single"; part: MessagePart & { type: "tool" }; index: number }
+  | { kind: "tool_group"; tools: { tool: ToolCall; index: number }[]; groupKey: string }
+  | { kind: "other"; part: NonToolPart; index: number }
+
+function groupParts(parts: MessagePart[]): RenderItem[] {
+  const items: RenderItem[] = []
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]
+    if (part.type === "tool" && part.tool.parent_run_id) {
+      const key = part.tool.parent_run_id
+      const last = items[items.length - 1]
+      if (last?.kind === "tool_group" && last.groupKey === key) {
+        last.tools.push({ tool: part.tool, index: i })
+      } else if (last?.kind === "tool_single" && last.part.tool.parent_run_id === key) {
+        items[items.length - 1] = {
+          kind: "tool_group",
+          groupKey: key,
+          tools: [{ tool: last.part.tool, index: last.index }, { tool: part.tool, index: i }],
+        }
+      } else {
+        items.push({ kind: "tool_single", part: part as MessagePart & { type: "tool" }, index: i })
+      }
+    } else {
+      items.push(part.type === "tool"
+        ? { kind: "tool_single", part: part as MessagePart & { type: "tool" }, index: i }
+        : { kind: "other", part: part as NonToolPart, index: i }
+      )
+    }
+  }
+  return items
+}
 
 function ThinkingBlock({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
   const [isOpen, setIsOpen] = useState(true)
@@ -85,6 +124,16 @@ export function MessageItem({
     setTimeout(() => setCopied(false), 1500)
   }
 
+  if (message.role === "system") {
+    return (
+      <div className="flex justify-center">
+        <span className="text-[11px] text-gray-400 italic px-3 py-1 bg-gray-50 rounded-full border border-gray-100">
+          {plainText}
+        </span>
+      </div>
+    )
+  }
+
   if (message.role === "user") {
     return (
       <div className="flex justify-end group">
@@ -123,16 +172,27 @@ export function MessageItem({
       </div>
 
       <div className="bg-white rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm space-y-1">
-        {message.parts.map((part, i) => {
-          if (part.type === "thinking") {
-            return <ThinkingBlock key={i} content={part.content} isStreaming={part.isStreaming} />
+        {groupParts(message.parts).map((item, ri) => {
+          if (item.kind === "tool_group") {
+            const lastToolIdx = item.tools[item.tools.length - 1].index
+            const autoCollapsed = message.parts.slice(lastToolIdx + 1).some(
+              (p) => p.type === "tool" || (p.type === "text" && p.content.length > 0)
+            )
+            return <ToolGroupBadge key={ri} tools={item.tools.map((t) => t.tool)} autoCollapsed={autoCollapsed} />
           }
 
-          if (part.type === "tool") {
+          if (item.kind === "tool_single") {
+            const { part, index: i } = item
             const autoCollapsed = message.parts.slice(i + 1).some(
               (p) => p.type === "tool" || (p.type === "text" && p.content.length > 0)
             )
-            return <ToolBadge key={i} tool={part.tool} autoCollapsed={autoCollapsed} />
+            return <ToolBadge key={ri} tool={part.tool} autoCollapsed={autoCollapsed} />
+          }
+
+          const { part, index: i } = item
+
+          if (part.type === "thinking") {
+            return <ThinkingBlock key={ri} content={part.content} isStreaming={part.isStreaming} />
           }
 
           if (part.type === "viz") {
@@ -151,7 +211,7 @@ export function MessageItem({
                   ? "generate_visualization_svg"
                   : "generate_visualization_mermaid"
             return (
-              <div key={i} className="py-1">
+              <div key={ri} className="py-1">
                 <div className="flex items-center gap-1.5 mb-2">
                   {icon}
                   <span className="text-[12px] font-semibold text-gray-600 font-mono">{label}</span>
@@ -172,9 +232,10 @@ export function MessageItem({
 
           const isLast = i === message.parts.length - 1
           return (
-            <div key={i} className="prose prose-sm max-w-none text-gray-800">
+            <div key={ri} className="prose prose-sm max-w-none text-gray-800">
               <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
                 components={{
                   p: ({ children }) => (
                     <p className="text-[14px] font-medium leading-[22px] text-gray-800 mb-2 last:mb-0">

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import {
   ChevronDown, ChevronRight, Download, Loader2,
-  Terminal, FileDown, Globe, Hash, Clock, Wrench,
+  Terminal, FileDown, Globe, Hash, Clock, Wrench, Layers,
 } from "lucide-react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
@@ -121,6 +121,54 @@ function OutputBlock({ output }: { output: string }) {
           {rendered}
         </ReactMarkdown>
       </div>
+    </div>
+  )
+}
+
+// ── Group Badge (multiple parallel tools) ─────────────────────────────────
+export function ToolGroupBadge({ tools, autoCollapsed }: { tools: ToolCall[]; autoCollapsed?: boolean }) {
+  const [open, setOpen] = useState(!autoCollapsed)
+
+  useEffect(() => {
+    if (autoCollapsed) setOpen(false)
+  }, [autoCollapsed])
+
+  const allDone = tools.every((t) => t.status === "done")
+  const anyRunning = tools.some((t) => t.status === "running" || t.status === "streaming")
+  const n = tools.length
+
+  const headerLabel = allDone
+    ? `${n} tools`
+    : anyRunning
+      ? `Running ${n} tools…`
+      : `${n} tools`
+
+  return (
+    <div className="py-1">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 hover:opacity-75 transition-opacity"
+      >
+        {anyRunning
+          ? <Loader2 className="size-3 animate-spin text-[#5661f6] shrink-0" />
+          : <Layers className="size-3 text-[#5661f6] shrink-0" />
+        }
+        <span className={`text-[12px] font-medium ${anyRunning ? "text-[#5661f6]" : "text-gray-500"}`}>
+          {headerLabel}
+        </span>
+        {allDone && (open
+          ? <ChevronDown className="size-3 text-gray-300" />
+          : <ChevronRight className="size-3 text-gray-300" />
+        )}
+      </button>
+
+      {open && (
+        <div className="mt-2 ml-1 border-l-2 border-[#E0E7FF] pl-3.5 space-y-1">
+          {tools.map((tool, i) => (
+            <ToolBadge key={i} tool={tool} autoCollapsed={false} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
