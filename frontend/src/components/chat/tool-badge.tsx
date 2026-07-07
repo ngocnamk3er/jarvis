@@ -116,6 +116,8 @@ function OutputBlock({ output }: { output: string }) {
               href?.includes("/api/v1/files/") || href?.includes("/jarvis-files/")
                 ? <DownloadLink href={href}>{children}</DownloadLink>
                 : <a href={href} className="text-[#5661f6] underline break-all" target="_blank" rel="noreferrer">{children}</a>,
+            img: ({ src, alt }) =>
+              src ? <img src={src} alt={alt ?? ""} className="max-w-full" /> : null,
           }}
         >
           {rendered}
