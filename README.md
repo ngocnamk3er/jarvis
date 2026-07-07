@@ -30,6 +30,16 @@ A full-stack AI chat application with tool use, file generation, web search, and
 | `web_search` | Live internet search via Tavily |
 | `run_python` | Execute Python in sandboxed Docker container |
 | `create_file` | Generate DOCX, PDF, PNG, SVG, XLSX files; stored in MinIO |
+| `generate_visualization_mermaid` | Render a Mermaid diagram (flowcharts, sequence diagrams, etc.) |
+| `generate_visualization_svg` | Render a custom SVG graphic |
+| `generate_animation` | Render a looping HTML/JS/CSS animation |
+| `generate_webapp` | Render an interactive HTML/JS/CSS web app or game |
+
+The four `generate_*` tools render their output in a headless Chromium page
+(same Mermaid build and iframe sandbox flags as the frontend) before
+returning — if the diagram fails to parse or the page throws a JS error, the
+tool returns `Error: ...` instead of the artifact, so the agent can see the
+failure and retry. See `app/agents/tools/viz_validate.py`.
 
 ### File Preview
 
@@ -75,6 +85,10 @@ make migrate
 
 # Build the Python sandbox Docker image (one-time)
 make build-sandbox
+
+# Install the headless Chromium browser used to validate generated
+# diagrams/animations/webapps before they're shown to the user (one-time)
+make install-browser
 
 # Start the backend
 make dev        # with auto-reload
