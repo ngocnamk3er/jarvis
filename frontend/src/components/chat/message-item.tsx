@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
-import { Copy, Check, Brain, ChevronDown, BarChart2, Clapperboard, Globe } from "lucide-react"
+import { Copy, Check, Brain, ChevronDown, Clapperboard, Globe } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
@@ -13,16 +13,6 @@ import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { Message, MessagePart, ToolCall } from "@/types/chat"
 import { ToolBadge, ToolGroupBadge } from "./tool-badge"
 import { extractFilesFromMessage, FileChips, GeneratedFile } from "./file-tray"
-
-const MermaidDiagram = dynamic(
-  () => import("./mermaid-diagram").then((m) => m.MermaidDiagram),
-  { ssr: false, loading: () => <div className="my-3 h-24 rounded-xl bg-gray-50 animate-pulse" /> }
-)
-
-const SvgDiagram = dynamic(
-  () => import("./svg-diagram").then((m) => m.SvgDiagram),
-  { ssr: false, loading: () => <div className="my-3 h-24 rounded-xl bg-gray-50 animate-pulse" /> }
-)
 
 const AnimationBlock = dynamic(
   () => import("./animation-block").then((m) => m.AnimationBlock),
@@ -197,19 +187,10 @@ export function MessageItem({
 
           if (part.type === "viz") {
             const isAnim = part.format === "html"
-            const isWebApp = part.format === "webapp"
-            const icon = isWebApp
-              ? <Globe className="size-3 text-[#5661f6] shrink-0" />
-              : isAnim
-                ? <Clapperboard className="size-3 text-[#5661f6] shrink-0" />
-                : <BarChart2 className="size-3 text-[#5661f6] shrink-0" />
-            const label = isWebApp
-              ? "generate_webapp"
-              : isAnim
-                ? "generate_animation"
-                : part.format === "svg"
-                  ? "generate_visualization_svg"
-                  : "generate_visualization_mermaid"
+            const icon = isAnim
+              ? <Clapperboard className="size-3 text-[#5661f6] shrink-0" />
+              : <Globe className="size-3 text-[#5661f6] shrink-0" />
+            const label = isAnim ? "generate_animation" : "generate_webapp"
             return (
               <div key={ri} className="py-1">
                 <div className="flex items-center gap-1.5 mb-2">
@@ -217,13 +198,9 @@ export function MessageItem({
                   <span className="text-[12px] font-semibold text-gray-600 font-mono">{label}</span>
                 </div>
                 <div className="ml-1 border-l-2 border-[#E0E7FF] pl-3.5">
-                  {isWebApp
-                    ? <WebAppBlock html={part.code} title={part.title} />
-                    : isAnim
-                      ? <AnimationBlock html={part.code} title={part.title} />
-                      : part.format === "svg"
-                        ? <SvgDiagram code={part.code} title={part.title} />
-                        : <MermaidDiagram code={part.code} title={part.title} />
+                  {isAnim
+                    ? <AnimationBlock html={part.code} title={part.title} />
+                    : <WebAppBlock html={part.code} title={part.title} />
                   }
                 </div>
               </div>
