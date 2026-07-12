@@ -25,21 +25,18 @@ A full-stack AI chat application with tool use, file generation, web search, and
 
 | Tool | Description |
 |---|---|
-| `calculator` | Safe arithmetic evaluation |
-| `get_current_time` | Current date and time |
-| `web_search` | Live internet search via Tavily |
-| `run_python` | Execute Python in sandboxed Docker container |
-| `create_file` | Generate DOCX, PDF, PNG, SVG, XLSX files; stored in MinIO |
-| `generate_visualization_mermaid` | Render a Mermaid diagram (flowcharts, sequence diagrams, etc.) |
-| `generate_visualization_svg` | Render a custom SVG graphic |
-| `generate_animation` | Render a looping HTML/JS/CSS animation |
-| `generate_webapp` | Render an interactive HTML/JS/CSS web app or game |
+| `bash` | Run shell/Python commands in a sandboxed Docker container (human-in-the-loop approval) |
+| `web_search` | Live internet search |
+| `web_fetch` | Fetch and read a specific URL |
+| `read_skill` | Load domain-specific guidance (python-dev, data-analysis, web-research, ...) |
+| `represent_file` | Surface a file from `/output` as a downloadable chip in the chat |
+| `generate_visualization_svg` | Render a custom SVG graphic — charts, diagrams, icons, flowcharts, or interactive visuals (CSS `:hover`, `<script>`, event handlers) |
 
-The four `generate_*` tools render their output in a headless Chromium page
-(same Mermaid build and iframe sandbox flags as the frontend) before
-returning — if the diagram fails to parse or the page throws a JS error, the
-tool returns `Error: ...` instead of the artifact, so the agent can see the
-failure and retry. See `app/agents/tools/viz_validate.py`.
+`generate_visualization_svg` renders its output in a headless Chromium page
+(same sanitization and iframe sandbox flags as the frontend) before
+returning — if the SVG fails to parse or throws a JS error, the tool returns
+`Error: ...` instead of the artifact, so the agent can see the failure and
+retry. See `app/agents/tools/viz_validate.py`.
 
 ### File Preview
 
@@ -87,7 +84,7 @@ make migrate
 make build-sandbox
 
 # Install the headless Chromium browser used to validate generated
-# diagrams/animations/webapps before they're shown to the user (one-time)
+# SVGs before they're shown to the user (one-time)
 make install-browser
 
 # Start the backend
@@ -150,7 +147,7 @@ jarvis/
 │   ├── app/
 │   │   ├── agents/
 │   │   │   ├── graph.py              # LangGraph agent
-│   │   │   └── tools/                # calculator, web_search, run_python, create_file
+│   │   │   └── tools/                # bash, web_search, web_fetch, generate_visualization_svg, ...
 │   │   ├── api/v1/endpoints/         # chat, conversations, files
 │   │   ├── db/
 │   │   │   ├── models.py             # SQLAlchemy declarative models

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
-import { Copy, Check, Brain, ChevronDown, BarChart2, Clapperboard, Globe } from "lucide-react"
+import { Copy, Check, Brain, ChevronDown, BarChart2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
@@ -14,24 +14,9 @@ import { Message, MessagePart, ToolCall } from "@/types/chat"
 import { ToolBadge, ToolGroupBadge } from "./tool-badge"
 import { extractFilesFromMessage, FileChips, GeneratedFile } from "./file-tray"
 
-const MermaidDiagram = dynamic(
-  () => import("./mermaid-diagram").then((m) => m.MermaidDiagram),
-  { ssr: false, loading: () => <div className="my-3 h-24 rounded-xl bg-gray-50 animate-pulse" /> }
-)
-
 const SvgDiagram = dynamic(
   () => import("./svg-diagram").then((m) => m.SvgDiagram),
   { ssr: false, loading: () => <div className="my-3 h-24 rounded-xl bg-gray-50 animate-pulse" /> }
-)
-
-const AnimationBlock = dynamic(
-  () => import("./animation-block").then((m) => m.AnimationBlock),
-  { ssr: false, loading: () => <div className="my-3 h-[400px] rounded-xl bg-gray-50 animate-pulse" /> }
-)
-
-const WebAppBlock = dynamic(
-  () => import("./webapp-block").then((m) => m.WebAppBlock),
-  { ssr: false, loading: () => <div className="my-3 h-[480px] rounded-xl bg-gray-50 animate-pulse" /> }
 )
 
 // ── Group consecutive tool parts sharing the same parent_run_id ────────────
@@ -196,35 +181,23 @@ export function MessageItem({
           }
 
           if (part.type === "viz") {
-            const isAnim = part.format === "html"
-            const isWebApp = part.format === "webapp"
-            const icon = isWebApp
-              ? <Globe className="size-3 text-[#5661f6] shrink-0" />
-              : isAnim
-                ? <Clapperboard className="size-3 text-[#5661f6] shrink-0" />
-                : <BarChart2 className="size-3 text-[#5661f6] shrink-0" />
-            const label = isWebApp
-              ? "generate_webapp"
-              : isAnim
-                ? "generate_animation"
-                : part.format === "svg"
-                  ? "generate_visualization_svg"
-                  : "generate_visualization_mermaid"
+            // Old conversations may still hold "mermaid"/"webapp"/"html" blocks
+            // from before those tools were removed — degrade gracefully instead of crashing.
+            if (part.format !== "svg") {
+              return (
+                <div key={ri} className="my-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-[12px] text-gray-400">
+                  This visualization type is no longer supported.
+                </div>
+              )
+            }
             return (
               <div key={ri} className="py-1">
                 <div className="flex items-center gap-1.5 mb-2">
-                  {icon}
-                  <span className="text-[12px] font-semibold text-gray-600 font-mono">{label}</span>
+                  <BarChart2 className="size-3 text-[#5661f6] shrink-0" />
+                  <span className="text-[12px] font-semibold text-gray-600 font-mono">generate_visualization_svg</span>
                 </div>
                 <div className="ml-1 border-l-2 border-[#E0E7FF] pl-3.5">
-                  {isWebApp
-                    ? <WebAppBlock html={part.code} title={part.title} />
-                    : isAnim
-                      ? <AnimationBlock html={part.code} title={part.title} />
-                      : part.format === "svg"
-                        ? <SvgDiagram code={part.code} title={part.title} />
-                        : <MermaidDiagram code={part.code} title={part.title} />
-                  }
+                  <SvgDiagram code={part.code} title={part.title} />
                 </div>
               </div>
             )

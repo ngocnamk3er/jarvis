@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Terminal, Globe, FileText, BarChart2, Sparkles, Code2 } from "lucide-react"
+import { Terminal, Globe, FileText, BarChart2, Sparkles } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 type Category = {
@@ -73,22 +73,6 @@ const CATEGORIES: Category[] = [
       "Tạo biểu đồ Gantt cho dự án 3 tháng",
       "Vẽ radar chart so sánh năng lực của 5 ứng viên",
       "Tạo mind map các khái niệm cốt lõi của machine learning",
-    ],
-  },
-  {
-    Icon: Code2,
-    label: "Xây dựng webapp",
-    prompts: [
-      "Tạo app tính lãi suất kép tương tác",
-      "Làm game Snake cổ điển chạy trong chat",
-      "Tạo todo list với drag-and-drop",
-      "Xây dựng máy tính khoa học với giao diện đẹp",
-      "Tạo app đếm ngược đến một ngày quan trọng",
-      "Làm quiz trắc nghiệm 10 câu về lịch sử Việt Nam",
-      "Tạo app chuyển đổi đơn vị (tiền tệ, nhiệt độ, khối lượng)",
-      "Xây dựng Pomodoro timer với âm thanh",
-      "Tạo app vẽ tay bằng Canvas",
-      "Làm game 2048 bằng JavaScript",
     ],
   },
   {
