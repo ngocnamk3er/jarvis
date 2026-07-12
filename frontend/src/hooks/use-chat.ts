@@ -173,6 +173,20 @@ async function runStream(body: ReadableStream<Uint8Array>, threadId: string, tar
           updateMsg((m) => ({ ...m, parts: [...m.parts, { type: "viz" as const, format: event.format, code: event.code, title: event.title }] }))
           break
 
+        case "usage":
+          updateMsg((m) => {
+            const prev = m.usage ?? { input_tokens: 0, output_tokens: 0, total_tokens: 0 }
+            return {
+              ...m,
+              usage: {
+                input_tokens: prev.input_tokens + event.input_tokens,
+                output_tokens: prev.output_tokens + event.output_tokens,
+                total_tokens: prev.total_tokens + event.total_tokens,
+              },
+            }
+          })
+          break
+
         case "hitl_request":
           _hitl.set(threadId, { actions: event.actions, review_configs: event.review_configs })
           _notify(threadId)
@@ -211,12 +225,13 @@ export function useChat(threadId: string | null) {
 
   const loadHistory = useCallback(async (id: string): Promise<boolean> => {
     const res = await fetch(`${API_URL}/api/v1/conversations/${id}/messages`)
-    const data: { messages: { role: string; parts: MessagePart[] }[]; is_pending: boolean } = await res.json()
+    const data: { messages: { role: string; parts: MessagePart[]; usage?: Message["usage"] }[]; is_pending: boolean } = await res.json()
     const loaded: Message[] = data.messages.map((m) => ({
       id: makeId(),
       role: m.role as "user" | "assistant" | "system",
       parts: m.parts,
       isStreaming: false,
+      usage: m.usage,
     }))
     _msgs.set(id, loaded)
     _interrupted.set(id, data.is_pending ?? false)

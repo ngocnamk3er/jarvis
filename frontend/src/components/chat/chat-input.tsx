@@ -62,6 +62,14 @@ const MODELS: ModelOption[] = [
     outputPrice: "$1.28",
     context: "1M",
   },
+  {
+    id: "anthropic/claude-opus-4.8",
+    name: "Claude Opus 4.8",
+    desc: "Frontier reasoning, vision",
+    inputPrice: "$1.70",
+    outputPrice: "$25.00",
+    context: "1M",
+  },
 ]
 
 const DEFAULT_MODEL = MODELS[0]

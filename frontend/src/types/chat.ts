@@ -25,13 +25,20 @@ export type MessagePart =
   | { type: "text"; content: string }
   | { type: "tool"; tool: ToolCall }
   | { type: "thinking"; content: string; isStreaming?: boolean }
-  | { type: "viz"; format: "mermaid" | "svg" | "html" | "webapp"; code: string; title?: string }
+  | { type: "viz"; format: "svg"; code: string; title?: string }
+
+export type TokenUsage = {
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+}
 
 export type Message = {
   id: string
   role: Role
   parts: MessagePart[]
   isStreaming: boolean
+  usage?: TokenUsage
 }
 
 export type HitlAction = {
@@ -56,8 +63,9 @@ export type StreamEvent =
   | { type: "tool_chunk"; index: number; name: string; args_delta: string }
   | { type: "tool_start"; name: string; label?: string; input?: unknown; run_id?: string }
   | { type: "tool_end"; name: string; output: string; run_id?: string }
-  | { type: "viz"; format: "mermaid" | "svg" | "html" | "webapp"; code: string; title?: string }
+  | { type: "viz"; format: "svg"; code: string; title?: string }
   | { type: "hitl_request"; actions: HitlAction[]; review_configs: HitlReviewConfig[] }
+  | ({ type: "usage" } & TokenUsage)
   | { type: "done" }
   | { type: "error"; message: string }
 
