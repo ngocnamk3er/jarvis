@@ -301,9 +301,9 @@ export function MessageItem({
         <div className="flex justify-start mt-1">
           <span
             className="text-[11px] text-gray-400 px-1"
-            title={`Input: ${message.usage.input_tokens.toLocaleString()} · Output: ${message.usage.output_tokens.toLocaleString()}`}
+            title={`Total: ${message.usage.total_tokens.toLocaleString()} tokens`}
           >
-            {message.usage.total_tokens.toLocaleString()} tokens{message.isStreaming ? "…" : ""}
+            {message.usage.input_tokens.toLocaleString()} in · {message.usage.output_tokens.toLocaleString()} out{message.isStreaming ? "…" : ""}
           </span>
         </div>
       )}
