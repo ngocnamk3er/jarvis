@@ -174,17 +174,17 @@ async function runStream(body: ReadableStream<Uint8Array>, threadId: string, tar
           break
 
         case "usage":
-          updateMsg((m) => {
-            const prev = m.usage ?? { input_tokens: 0, output_tokens: 0, total_tokens: 0 }
-            return {
-              ...m,
-              usage: {
-                input_tokens: prev.input_tokens + event.input_tokens,
-                output_tokens: prev.output_tokens + event.output_tokens,
-                total_tokens: prev.total_tokens + event.total_tokens,
+          updateMsg((m) => ({
+            ...m,
+            usage: [
+              ...(m.usage ?? []),
+              {
+                input_tokens: event.input_tokens,
+                output_tokens: event.output_tokens,
+                total_tokens: event.total_tokens,
               },
-            }
-          })
+            ],
+          }))
           break
 
         case "hitl_request":

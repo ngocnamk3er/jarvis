@@ -38,7 +38,10 @@ export type Message = {
   role: Role
   parts: MessagePart[]
   isStreaming: boolean
-  usage?: TokenUsage
+  // One entry per LLM call within this turn (a turn may call the model
+  // multiple times for tool round-trips) — NOT summed, since each call's
+  // input_tokens already includes all prior calls' context in this turn.
+  usage?: TokenUsage[]
 }
 
 export type HitlAction = {

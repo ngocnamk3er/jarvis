@@ -10,7 +10,7 @@ import rehypeKatex from "rehype-katex"
 import "katex/dist/katex.min.css"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
-import { Message, MessagePart, ToolCall } from "@/types/chat"
+import { Message, MessagePart, ToolCall, TokenUsage } from "@/types/chat"
 import { ToolBadge, ToolGroupBadge } from "./tool-badge"
 import { extractFilesFromMessage, FileChips, GeneratedFile } from "./file-tray"
 
@@ -81,6 +81,55 @@ function ThinkingBlock({ content, isStreaming }: { content: string; isStreaming?
           {isStreaming && (
             <span className="ml-0.5 inline-block w-[3px] h-[11px] bg-gray-400 opacity-60 animate-pulse align-text-bottom" />
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function UsageFooter({ usage, isStreaming }: { usage: TokenUsage[]; isStreaming: boolean }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const total = usage.reduce(
+    (acc, u) => ({
+      input_tokens: acc.input_tokens + u.input_tokens,
+      output_tokens: acc.output_tokens + u.output_tokens,
+      total_tokens: acc.total_tokens + u.total_tokens,
+    }),
+    { input_tokens: 0, output_tokens: 0, total_tokens: 0 }
+  )
+  const suffix = isStreaming ? "…" : ""
+
+  if (usage.length <= 1) {
+    return (
+      <div className="flex justify-start mt-1">
+        <span className="text-[11px] text-gray-400 px-1" title={`Total: ${total.total_tokens.toLocaleString()} tokens`}>
+          {total.input_tokens.toLocaleString()} in · {total.output_tokens.toLocaleString()} out{suffix}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-1">
+      <button
+        onClick={() => setIsOpen((o) => !o)}
+        className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-500 transition-colors select-none px-1"
+      >
+        <span title={`Sum of ${usage.length} model calls in this turn — not the true context size, since each call already includes all prior calls' context.`}>
+          {total.input_tokens.toLocaleString()} in · {total.output_tokens.toLocaleString()} out{suffix} ({usage.length} calls)
+        </span>
+        <ChevronDown
+          className="size-3 transition-transform duration-200"
+          style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+        />
+      </button>
+      {isOpen && (
+        <div className="mt-1 ml-1 pl-3 border-l-2 border-gray-100 space-y-0.5">
+          {usage.map((u, i) => (
+            <div key={i} className="text-[11px] text-gray-400">
+              Call {i + 1}: {u.input_tokens.toLocaleString()} in · {u.output_tokens.toLocaleString()} out
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -297,15 +346,8 @@ export function MessageItem({
         )}
       </div>
 
-      {message.usage && (
-        <div className="flex justify-start mt-1">
-          <span
-            className="text-[11px] text-gray-400 px-1"
-            title={`Total: ${message.usage.total_tokens.toLocaleString()} tokens`}
-          >
-            {message.usage.input_tokens.toLocaleString()} in · {message.usage.output_tokens.toLocaleString()} out{message.isStreaming ? "…" : ""}
-          </span>
-        </div>
+      {message.usage && message.usage.length > 0 && (
+        <UsageFooter usage={message.usage} isStreaming={message.isStreaming} />
       )}
     </div>
   )
