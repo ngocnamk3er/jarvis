@@ -140,11 +140,11 @@ async function runStream(body: ReadableStream<Uint8Array>, threadId: string, tar
               return {
                 ...m,
                 parts: m.parts.map((p, i) => i === streamingIdx
-                  ? { ...p, tool: { ...(p as { type: "tool"; tool: ToolCall }).tool, label: event.label, input: event.input, status: "running" as const, run_id: event.run_id, parent_run_id: currentBatchId } }
+                  ? { ...p, tool: { ...(p as { type: "tool"; tool: ToolCall }).tool, label: event.label, input: event.input, status: "running" as const, run_id: event.run_id, parent_run_id: currentBatchId, task_run_id: event.task_run_id } }
                   : p),
               }
             }
-            return { ...m, parts: [...m.parts, { type: "tool" as const, tool: { name: event.name, label: event.label, input: event.input, status: "running" as const, run_id: event.run_id, parent_run_id: currentBatchId } }] }
+            return { ...m, parts: [...m.parts, { type: "tool" as const, tool: { name: event.name, label: event.label, input: event.input, status: "running" as const, run_id: event.run_id, parent_run_id: currentBatchId, task_run_id: event.task_run_id } }] }
           })
           break
         }

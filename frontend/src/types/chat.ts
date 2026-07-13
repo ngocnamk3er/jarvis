@@ -19,6 +19,10 @@ export type ToolCall = {
   status: ToolStatus
   run_id?: string
   parent_run_id?: string
+  // run_id of the `task` call this tool call happened inside (via a
+  // subagent's own tool loop), so the UI can nest it under that badge
+  // instead of showing it as an unrelated top-level row.
+  task_run_id?: string
 }
 
 export type MessagePart =
@@ -64,8 +68,8 @@ export type StreamEvent =
   | { type: "token"; content: string }
   | { type: "thinking_token"; content: string }
   | { type: "tool_chunk"; index: number; name: string; args_delta: string }
-  | { type: "tool_start"; name: string; label?: string; input?: unknown; run_id?: string }
-  | { type: "tool_end"; name: string; output: string; run_id?: string }
+  | { type: "tool_start"; name: string; label?: string; input?: unknown; run_id?: string; task_run_id?: string }
+  | { type: "tool_end"; name: string; output: string; run_id?: string; task_run_id?: string }
   | { type: "viz"; format: "svg"; code: string; title?: string }
   | { type: "hitl_request"; actions: HitlAction[]; review_configs: HitlReviewConfig[] }
   | ({ type: "usage" } & TokenUsage)

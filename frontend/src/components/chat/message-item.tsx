@@ -55,6 +55,64 @@ function groupParts(parts: MessagePart[]): RenderItem[] {
   return items
 }
 
+// A subagent's own tool calls (via the `task` tool) carry `task_run_id`
+// pointing at the run_id of the `task` call they happened inside. Pull them
+// out of the flat list and index them by that id, so each one renders nested
+// inside its own "Delegating to sub-agent" badge instead of as an unrelated
+// top-level row.
+function splitNestedTools(parts: MessagePart[]): { topLevel: MessagePart[]; byTaskRunId: Map<string, MessagePart[]> } {
+  const topLevel: MessagePart[] = []
+  const byTaskRunId = new Map<string, MessagePart[]>()
+  for (const part of parts) {
+    if (part.type === "tool" && part.tool.task_run_id) {
+      const arr = byTaskRunId.get(part.tool.task_run_id) ?? []
+      arr.push(part)
+      byTaskRunId.set(part.tool.task_run_id, arr)
+    } else {
+      topLevel.push(part)
+    }
+  }
+  return { topLevel, byTaskRunId }
+}
+
+// Renders a group of tool parts (top-level or a task's nested children) as
+// badges, recursing so a task's own children can themselves have nested tools.
+function renderToolItems(parts: MessagePart[], byTaskRunId: Map<string, MessagePart[]>): React.ReactNode {
+  const renderChildrenFor = (tool: ToolCall) => {
+    const nested = tool.run_id ? byTaskRunId.get(tool.run_id) : undefined
+    return nested && nested.length > 0 ? renderToolItems(nested, byTaskRunId) : undefined
+  }
+
+  return groupParts(parts).map((item, ri) => {
+    if (item.kind === "tool_group") {
+      const lastToolIdx = item.tools[item.tools.length - 1].index
+      const autoCollapsed = parts.slice(lastToolIdx + 1).some(
+        (p) => p.type === "tool" || (p.type === "text" && p.content.length > 0)
+      )
+      return (
+        <ToolGroupBadge
+          key={ri}
+          tools={item.tools.map((t) => t.tool)}
+          autoCollapsed={autoCollapsed}
+          renderChildren={renderChildrenFor}
+        />
+      )
+    }
+    if (item.kind === "tool_single") {
+      const { part, index: i } = item
+      const autoCollapsed = parts.slice(i + 1).some(
+        (p) => p.type === "tool" || (p.type === "text" && p.content.length > 0)
+      )
+      return (
+        <ToolBadge key={ri} tool={part.tool} autoCollapsed={autoCollapsed}>
+          {renderChildrenFor(part.tool)}
+        </ToolBadge>
+      )
+    }
+    return null
+  })
+}
+
 function ThinkingBlock({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
   const [isOpen, setIsOpen] = useState(true)
 
@@ -152,6 +210,12 @@ export function MessageItem({
     .map((p) => p.content)
     .join("")
 
+  const { topLevel: topLevelParts, byTaskRunId } = splitNestedTools(message.parts)
+  const renderNestedFor = (tool: ToolCall) => {
+    const nested = tool.run_id ? byTaskRunId.get(tool.run_id) : undefined
+    return nested && nested.length > 0 ? renderToolItems(nested, byTaskRunId) : undefined
+  }
+
   const copy = async () => {
     await navigator.clipboard.writeText(plainText)
     setCopied(true)
@@ -206,21 +270,32 @@ export function MessageItem({
       </div>
 
       <div className="bg-white rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm space-y-1">
-        {groupParts(message.parts).map((item, ri) => {
+        {groupParts(topLevelParts).map((item, ri) => {
           if (item.kind === "tool_group") {
             const lastToolIdx = item.tools[item.tools.length - 1].index
-            const autoCollapsed = message.parts.slice(lastToolIdx + 1).some(
+            const autoCollapsed = topLevelParts.slice(lastToolIdx + 1).some(
               (p) => p.type === "tool" || (p.type === "text" && p.content.length > 0)
             )
-            return <ToolGroupBadge key={ri} tools={item.tools.map((t) => t.tool)} autoCollapsed={autoCollapsed} />
+            return (
+              <ToolGroupBadge
+                key={ri}
+                tools={item.tools.map((t) => t.tool)}
+                autoCollapsed={autoCollapsed}
+                renderChildren={renderNestedFor}
+              />
+            )
           }
 
           if (item.kind === "tool_single") {
             const { part, index: i } = item
-            const autoCollapsed = message.parts.slice(i + 1).some(
+            const autoCollapsed = topLevelParts.slice(i + 1).some(
               (p) => p.type === "tool" || (p.type === "text" && p.content.length > 0)
             )
-            return <ToolBadge key={ri} tool={part.tool} autoCollapsed={autoCollapsed} />
+            return (
+              <ToolBadge key={ri} tool={part.tool} autoCollapsed={autoCollapsed}>
+                {renderNestedFor(part.tool)}
+              </ToolBadge>
+            )
           }
 
           const { part, index: i } = item
@@ -252,7 +327,7 @@ export function MessageItem({
             )
           }
 
-          const isLast = i === message.parts.length - 1
+          const isLast = i === topLevelParts.length - 1
           return (
             <div key={ri} className="prose prose-sm max-w-none text-gray-800">
               <ReactMarkdown

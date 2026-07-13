@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import {
   ChevronDown, ChevronRight, Download, Loader2,
-  Terminal, FileDown, Globe, Hash, Clock, Wrench, Layers,
+  Terminal, FileDown, Globe, Hash, Clock, Wrench, Layers, Bot,
 } from "lucide-react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
@@ -19,8 +19,8 @@ const TOOL_META: Record<string, ToolMeta> = {
   bash:             { label: "Running command",    Icon: Terminal  },
   represent_file:   { label: "Exporting file",     Icon: FileDown  },
   web_search:       { label: "Searching the web",  Icon: Globe     },
-  calculator:       { label: "Calculating",         Icon: Hash      },
-  get_current_time: { label: "Getting time",        Icon: Clock     },
+  web_fetch:        { label: "Fetching page",       Icon: Globe     },
+  task:             { label: "Delegating to sub-agent", Icon: Bot   },
 }
 
 function getMeta(name: string): ToolMeta {
@@ -128,7 +128,17 @@ function OutputBlock({ output }: { output: string }) {
 }
 
 // ── Group Badge (multiple parallel tools) ─────────────────────────────────
-export function ToolGroupBadge({ tools, autoCollapsed }: { tools: ToolCall[]; autoCollapsed?: boolean }) {
+export function ToolGroupBadge({
+  tools,
+  autoCollapsed,
+  renderChildren,
+}: {
+  tools: ToolCall[]
+  autoCollapsed?: boolean
+  // Renders a tool's own nested calls (e.g. a subagent's web_search/web_fetch,
+  // via the `task` tool) inside that tool's own expanded badge.
+  renderChildren?: (tool: ToolCall) => React.ReactNode
+}) {
   const [open, setOpen] = useState(!autoCollapsed)
 
   useEffect(() => {
@@ -165,7 +175,9 @@ export function ToolGroupBadge({ tools, autoCollapsed }: { tools: ToolCall[]; au
       {open && (
         <div className="mt-2 ml-1 border-l-2 border-[#E0E7FF] pl-3.5 space-y-1">
           {tools.map((tool, i) => (
-            <ToolBadge key={i} tool={tool} autoCollapsed={false} />
+            <ToolBadge key={i} tool={tool} autoCollapsed={false}>
+              {renderChildren?.(tool)}
+            </ToolBadge>
           ))}
         </div>
       )}
@@ -174,7 +186,17 @@ export function ToolGroupBadge({ tools, autoCollapsed }: { tools: ToolCall[]; au
 }
 
 // ── Badge ──────────────────────────────────────────────────────────────────
-export function ToolBadge({ tool, autoCollapsed }: { tool: ToolCall; autoCollapsed?: boolean }) {
+export function ToolBadge({
+  tool,
+  autoCollapsed,
+  children,
+}: {
+  tool: ToolCall
+  autoCollapsed?: boolean
+  // A subagent's own tool calls (via the `task` tool), rendered nested
+  // inside this badge instead of as unrelated top-level rows.
+  children?: React.ReactNode
+}) {
   const [open, setOpen] = useState(!autoCollapsed)
   const { label: metaLabel, Icon } = getMeta(tool.name)
   const label = tool.label || metaLabel
@@ -194,7 +216,8 @@ export function ToolBadge({ tool, autoCollapsed }: { tool: ToolCall; autoCollaps
     )
   }
 
-  // Running — spinner + label
+  // Running — spinner + label (+ live nested children, if any, so a
+  // subagent's searches show up as they happen, not just once it's done)
   if (tool.status === "running") {
     return (
       <div className="py-1">
@@ -202,9 +225,10 @@ export function ToolBadge({ tool, autoCollapsed }: { tool: ToolCall; autoCollaps
           <Loader2 className="size-3 animate-spin text-[#5661f6] shrink-0" />
           <span className="text-[12px] font-medium text-[#5661f6]">{label}</span>
         </div>
-        {tool.input !== undefined && (
-          <div className="ml-1 border-l-2 border-[#E0E7FF] pl-3.5">
-            <InputBlock input={tool.input} />
+        {(tool.input !== undefined || children) && (
+          <div className="ml-1 border-l-2 border-[#E0E7FF] pl-3.5 space-y-2">
+            {tool.input !== undefined && <InputBlock input={tool.input} />}
+            {children}
           </div>
         )}
       </div>
@@ -229,6 +253,7 @@ export function ToolBadge({ tool, autoCollapsed }: { tool: ToolCall; autoCollaps
       {open && (
         <div className="mt-2.5 ml-1 space-y-3 border-l-2 border-[#E0E7FF] pl-3.5">
           {tool.input !== undefined && <InputBlock input={tool.input} />}
+          {children}
           {tool.output !== undefined && <OutputBlock output={tool.output} />}
         </div>
       )}
