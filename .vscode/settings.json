@@ -6,5 +6,8 @@
     "editor.formatOnSave": true
   },
   "python-envs.defaultEnvManager": "ms-python.python:venv",
-  "python-envs.defaultPackageManager": "ms-python.python:pip"
+  "python-envs.defaultPackageManager": "ms-python.python:pip",
+  "python.analysis.extraPaths": [
+    "./backend"
+  ]
 }
