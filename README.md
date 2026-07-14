@@ -28,7 +28,6 @@ A full-stack AI chat application with tool use, file generation, web search, and
 | `bash` | Run shell/Python commands in a sandboxed Docker container (human-in-the-loop approval) |
 | `web_search` | Live internet search |
 | `web_fetch` | Fetch and read a specific URL |
-| `read_skill` | Load domain-specific guidance (python-dev, data-analysis, web-research, ...) |
 | `represent_file` | Surface a file from `/output` as a downloadable chip in the chat |
 | `generate_visualization_svg` | Render a custom SVG graphic — charts, diagrams, icons, flowcharts, or interactive visuals (CSS `:hover`, `<script>`, event handlers) |
 
