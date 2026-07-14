@@ -111,7 +111,7 @@ export function ChatWindow() {
           {hasMessages ? (
             <MessageList messages={messages} previewFile={previewFile} onPreviewFile={setPreviewFile} />
           ) : (
-            <EmptyState onSend={handleSend} />
+            <EmptyState />
           )}
 
           {pendingHitl && !isLoading && (
