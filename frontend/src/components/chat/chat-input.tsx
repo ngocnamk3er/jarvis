@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, KeyboardEvent } from "react"
 import { SendHorizontal, Loader2, Brain, ChevronDown, Check, Cpu, Paperclip, X, File } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThinkingEffort, Model } from "@/types/chat"
+import { useModels } from "@/hooks/use-models"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ""
 
@@ -13,66 +14,6 @@ const EFFORT_OPTIONS: { value: ThinkingEffort; label: string; desc: string }[] =
   { value: "high", label: "High", desc: "Deep reasoning" },
   { value: "xhigh", label: "Max", desc: "Most thorough, slowest" },
 ]
-
-type ModelOption = Model & {
-  desc: string
-  inputPrice: string
-  outputPrice: string
-  context: string
-}
-
-const MODELS: ModelOption[] = [
-  {
-    id: "openai/gpt-5-nano",
-    name: "GPT-5 Nano",
-    desc: "Fast, cheap, vision",
-    inputPrice: "$0.05",
-    outputPrice: "$0.40",
-    context: "400K",
-  },
-  {
-    id: "meta-llama/llama-4-scout",
-    name: "Llama 4 Scout",
-    desc: "10M context, vision",
-    inputPrice: "$0.10",
-    outputPrice: "$0.30",
-    context: "10M",
-  },
-  {
-    id: "google/gemini-2.5-flash-lite",
-    name: "Gemini 2.5 Flash Lite",
-    desc: "Google lightweight, vision",
-    inputPrice: "$0.10",
-    outputPrice: "$0.40",
-    context: "1M",
-  },
-  {
-    id: "qwen/qwen3-vl-32b-instruct",
-    name: "Qwen3 VL 32B",
-    desc: "Vision specialist",
-    inputPrice: "$0.10",
-    outputPrice: "$0.42",
-    context: "262K",
-  },
-  {
-    id: "qwen/qwen3.7-plus",
-    name: "Qwen 3.7+",
-    desc: "High quality, vision",
-    inputPrice: "$0.32",
-    outputPrice: "$1.28",
-    context: "1M",
-  },
-  {
-    id: "anthropic/claude-opus-4.8",
-    name: "Claude Opus 4.8",
-    desc: "Frontier reasoning, vision",
-    inputPrice: "$1.70",
-    outputPrice: "$25.00",
-    context: "1M",
-  },
-]
-
-const DEFAULT_MODEL = MODELS[0]
 
 type AttachedFile = { name: string; virtualPath: string }
 
@@ -84,9 +25,10 @@ type Props = {
 }
 
 export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: Props) {
+  const { models } = useModels()
   const [value, setValue] = useState("")
   const [effort, setEffort] = useState<ThinkingEffort>("high")
-  const [model, setModel] = useState<ModelOption>(DEFAULT_MODEL)
+  const [model, setModel] = useState<Model | null>(null)
   const [effortOpen, setEffortOpen] = useState(false)
   const [modelOpen, setModelOpen] = useState(false)
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
@@ -106,7 +48,7 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: 
 
   const submit = () => {
     const trimmed = value.trim()
-    if ((!trimmed && attachedFiles.length === 0) || disabled) return
+    if ((!trimmed && attachedFiles.length === 0) || disabled || !model) return
 
     let content = trimmed
     if (attachedFiles.length > 0) {
@@ -178,8 +120,12 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: 
     return () => document.removeEventListener("mousedown", handler)
   }, [])
 
+  useEffect(() => {
+    if (!model && models.length > 0) setModel(models[0])
+  }, [models, model])
+
   const currentEffort = EFFORT_OPTIONS.find((o) => o.value === effort)!
-  const canSend = !disabled && (value.trim().length > 0 || attachedFiles.length > 0)
+  const canSend = !disabled && !!model && (value.trim().length > 0 || attachedFiles.length > 0)
 
   return (
     <div className="px-8 pb-7 pt-3">
@@ -294,7 +240,7 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: 
                   className="flex items-center gap-1.5 bg-[#EEF0FF] hover:bg-[#E4E7FF] transition-colors rounded-full px-2.5 py-1"
                 >
                   <Cpu className="size-3 text-[#5661f6] shrink-0" />
-                  <span className="text-[11px] font-semibold text-[#5661f6]">{model.name}</span>
+                  <span className="text-[11px] font-semibold text-[#5661f6]">{model?.name ?? "Loading…"}</span>
                   <ChevronDown
                     className="size-2.5 text-[#5661f6] transition-transform duration-150"
                     style={{ transform: modelOpen ? "rotate(180deg)" : "rotate(0deg)" }}
@@ -303,19 +249,19 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: 
 
                 {modelOpen && (
                   <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-2xl shadow-lg border border-gray-100 py-1 z-10">
-                    {MODELS.map((m) => (
+                    {models.map((m) => (
                       <button
                         key={m.id}
                         onClick={() => { setModel(m); setModelOpen(false) }}
                         className={cn(
                           "w-full flex items-start gap-2.5 px-3 py-2 hover:bg-gray-50 transition-colors text-left",
-                          m.id === model.id && "bg-[#EEF0FF] hover:bg-[#E4E7FF]"
+                          m.id === model?.id && "bg-[#EEF0FF] hover:bg-[#E4E7FF]"
                         )}
                       >
                         <div className="flex-1 min-w-0">
                           <p className={cn(
                             "text-[12px] font-semibold leading-[16px]",
-                            m.id === model.id ? "text-[#5661f6]" : "text-gray-700"
+                            m.id === model?.id ? "text-[#5661f6]" : "text-gray-700"
                           )}>
                             {m.name}
                           </p>
@@ -328,7 +274,7 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: 
                             <span className="text-[10px] text-gray-400">{m.context} ctx</span>
                           </div>
                         </div>
-                        {m.id === model.id && (
+                        {m.id === model?.id && (
                           <Check className="size-3 text-[#5661f6] shrink-0 mt-0.5" />
                         )}
                       </button>

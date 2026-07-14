@@ -5,6 +5,10 @@ export type ThinkingEffort = "low" | "medium" | "high" | "xhigh"
 export type Model = {
   id: string
   name: string
+  desc: string
+  inputPrice: string
+  outputPrice: string
+  context: string
 }
 
 export type ToolStatus = "streaming" | "running" | "done"
