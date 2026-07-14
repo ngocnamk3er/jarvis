@@ -121,7 +121,7 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: 
   }, [])
 
   useEffect(() => {
-    if (!model && models.length > 0) setModel(models[0])
+    if (!model && models.length > 0) setModel(models.find((m) => m.default) ?? models[0])
   }, [models, model])
 
   const currentEffort = EFFORT_OPTIONS.find((o) => o.value === effort)!

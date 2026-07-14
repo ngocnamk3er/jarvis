@@ -9,6 +9,7 @@ export type Model = {
   inputPrice: string
   outputPrice: string
   context: string
+  default?: boolean
 }
 
 export type ToolStatus = "streaming" | "running" | "done"
