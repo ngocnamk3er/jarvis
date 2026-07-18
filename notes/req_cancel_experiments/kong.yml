@@ -1,0 +1,9 @@
+_format_version: "3.0"
+services:
+  - name: chat-backend
+    url: http://127.0.0.1:9001
+    routes:
+      - name: chat-stream-route
+        paths:
+          - /stream
+        strip_path: false
