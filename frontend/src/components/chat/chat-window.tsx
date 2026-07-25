@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { RotateCcw } from "lucide-react"
 import { useChat, useLoadingThreadIds } from "@/hooks/use-chat"
 import { useConversations } from "@/hooks/use-conversations"
+import { useModels } from "@/hooks/use-models"
 import { Sidebar } from "./sidebar"
 import { EmptyState } from "./empty-state"
 import { MessageList } from "./message-list"
@@ -21,6 +22,7 @@ export function ChatWindow() {
   const searchParams = useSearchParams()
 
   const { conversations, create, remove, setLastModel } = useConversations()
+  const { models } = useModels()
   const [activeId, setActiveId] = useState<string | null>(null)
   const pendingContent = useRef<{ content: string; effort: import("@/types/chat").ThinkingEffort; model?: import("@/types/chat").Model } | null>(null)
   // Set synchronously (a ref, not state) the moment a message is sent, so a
@@ -102,6 +104,15 @@ export function ChatWindow() {
     }
   }
 
+  // Same model this conversation is already using — resume must carry it
+  // forward explicitly, since the backend has no other way to know which
+  // model an approve/reject should continue with (see chat_service.resume).
+  const resumeModelId =
+    (activeId && lastSentModel.current.get(activeId)) ??
+    conversations.find((c) => c.id === activeId)?.last_model ??
+    null
+  const resumeModel = models.find((m) => m.id === resumeModelId)
+
   const handleRetry = () => {
     const lastUser = [...messages].reverse().find((m) => m.role === "user")
     if (!lastUser) return
@@ -133,8 +144,8 @@ export function ChatWindow() {
           {pendingHitl && !isLoading && (
             <HitlApproval
               hitl={pendingHitl}
-              onApprove={() => resumeMessage("approve")}
-              onReject={() => resumeMessage("reject")}
+              onApprove={() => resumeMessage("approve", resumeModel)}
+              onReject={() => resumeMessage("reject", resumeModel)}
             />
           )}
 

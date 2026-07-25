@@ -306,7 +306,7 @@ export function useChat(threadId: string | null) {
   )
 
   const resumeMessage = useCallback(
-    async (decision: "approve" | "reject") => {
+    async (decision: "approve" | "reject", model?: Model) => {
       if (!threadId) return
       const msgs = _msgs.get(threadId) ?? []
       let resumeId = ""
@@ -336,7 +336,7 @@ export function useChat(threadId: string | null) {
       const res = await fetch(`${API_URL}/api/v1/chat/resume`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ thread_id: threadId, decision }),
+        body: JSON.stringify({ thread_id: threadId, decision, model: model?.id }),
       }).catch(() => null)
 
       if (!res?.body) {
