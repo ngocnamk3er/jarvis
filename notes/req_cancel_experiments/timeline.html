@@ -1,0 +1,526 @@
+<title>Does the backend stop when you hit F5?</title>
+<style>
+  :root {
+    --page:        #f9f9f7;
+    --surface:     #fcfcfb;
+    --surface-well:#f2f1ed;
+    --text-1:      #0b0b0b;
+    --text-2:      #52514e;
+    --text-muted:  #898781;
+    --gridline:    #e1e0d9;
+    --baseline:    #c3c2b7;
+    --border:      rgba(11,11,11,0.10);
+    --accent:      #2a78d6;
+    --good:        #0ca30c;
+    --critical:    #d03b3b;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Segoe UI Mono", Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      --page:        #0d0d0d;
+      --surface:     #1a1a19;
+      --surface-well:#141413;
+      --text-1:      #ffffff;
+      --text-2:      #c3c2b7;
+      --text-muted:  #898781;
+      --gridline:    #2c2c2a;
+      --baseline:    #383835;
+      --border:      rgba(255,255,255,0.10);
+      --accent:      #3987e5;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page:        #0d0d0d;
+    --surface:     #1a1a19;
+    --surface-well:#141413;
+    --text-1:      #ffffff;
+    --text-2:      #c3c2b7;
+    --text-muted:  #898781;
+    --gridline:    #2c2c2a;
+    --baseline:    #383835;
+    --border:      rgba(255,255,255,0.10);
+    --accent:      #3987e5;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text-1);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  header.page-head { margin-bottom: 36px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-size: 30px;
+    line-height: 1.2;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    margin: 0 0 12px;
+    text-wrap: balance;
+  }
+  .deck {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-2);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .deck code { font-family: var(--mono); font-size: 0.92em; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  /* ---- Timeline chart ---- */
+  .chart-card { padding: 28px 28px 20px; margin-bottom: 28px; }
+  .chart-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+    margin: 0 0 4px;
+  }
+  .chart-sub {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin: 0 0 18px;
+  }
+  .chart-scroll { overflow-x: auto; }
+  svg.timeline { display: block; min-width: 640px; }
+
+  .row-label {
+    font-size: 13px;
+    font-weight: 550;
+    fill: var(--text-1);
+  }
+  .row-sub {
+    font-size: 11px;
+    fill: var(--text-muted);
+  }
+  .axis-tick { font-size: 11px; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .axis-unit { font-size: 11px; fill: var(--text-muted); }
+  .gridline { stroke: var(--gridline); stroke-width: 1; }
+  .baseline { stroke: var(--baseline); stroke-width: 1; }
+
+  .disc-line { stroke: var(--text-2); stroke-width: 1.5; stroke-dasharray: 3 3; }
+  .disc-label {
+    font-size: 11px;
+    font-weight: 600;
+    fill: var(--text-2);
+  }
+
+  .bar { rx: 4; }
+  .bar-good { fill: var(--good); }
+  .bar-critical { fill: var(--critical); }
+
+  .tip-label { font-size: 12px; font-weight: 600; fill: var(--text-1); }
+  .tip-label-inv { font-size: 12px; font-weight: 600; fill: #ffffff; }
+
+  .hit { fill: transparent; cursor: pointer; }
+  .hit:focus { outline: none; }
+  .hit:focus-visible ~ .bar,
+  .row-group:focus-within .bar {
+    filter: brightness(1.08);
+  }
+
+  /* ---- Legend ---- */
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+    padding-top: 16px;
+    border-top: 1px solid var(--gridline);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--text-2);
+  }
+  .swatch {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+    flex: none;
+  }
+  .swatch.good { background: var(--good); }
+  .swatch.critical { background: var(--critical); }
+
+  /* ---- Tooltip ---- */
+  #tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-2);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    max-width: 280px;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 120ms ease, transform 120ms ease;
+    z-index: 20;
+  }
+  #tooltip.visible { opacity: 1; transform: translateY(0); }
+  #tooltip .tt-title { font-weight: 650; color: var(--text-1); margin-bottom: 4px; }
+  #tooltip code {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--surface-well);
+    padding: 1px 4px;
+    border-radius: 4px;
+    color: var(--text-1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #tooltip { transition: none; }
+  }
+
+  /* ---- Scenario cards ---- */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 720px) {
+    .cards { grid-template-columns: 1fr; }
+  }
+  .scenario-card { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .scenario-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .scenario-name { font-size: 14px; font-weight: 620; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 650;
+    padding: 3px 8px 3px 6px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .chip.good { color: var(--good); }
+  .chip.critical { color: var(--critical); }
+  .chip span.dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor;
+    flex: none;
+  }
+  .chip .chip-text { color: var(--text-1); }
+
+  .scenario-why {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-2);
+    margin: 0;
+  }
+  .log {
+    background: var(--surface-well);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--text-2);
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .log .t { color: var(--text-muted); }
+  .log .hit-good { color: var(--good); }
+  .log .hit-critical { color: var(--critical); }
+
+  /* ---- Insight callout ---- */
+  .callout {
+    padding: 18px 20px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    border-left: 3px solid var(--accent);
+    margin-bottom: 24px;
+  }
+  .callout p { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-2); }
+  .callout strong { color: var(--text-1); }
+
+  /* ---- Table view ---- */
+  details.table-view summary {
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+    padding: 6px 0;
+    user-select: none;
+  }
+  details.table-view summary:hover { color: var(--text-1); }
+  .table-scroll { overflow-x: auto; margin-top: 12px; }
+  table.data {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 12.5px;
+    min-width: 560px;
+  }
+  table.data th, table.data td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--gridline);
+  }
+  table.data th {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  table.data td.num { font-variant-numeric: tabular-nums; font-family: var(--mono); }
+
+  footer.page-foot {
+    margin-top: 28px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  footer.page-foot a { color: var(--text-2); }
+</style>
+
+<div class="wrap">
+  <header class="page-head">
+    <p class="eyebrow">Live test &middot; 2026-07-18 &middot; req_cancel_experiments</p>
+    <h1>Does the backend stop when you hit F5?</h1>
+    <p class="deck">
+      Same <code>StreamingResponse</code> + LangGraph shape, three network paths.
+      Client killed 3 seconds into a 30-second stream each time &mdash; watch what
+      happens to the backend after that.
+    </p>
+  </header>
+
+  <section class="card chart-card" aria-label="Timeline chart">
+    <p class="chart-title">Backend activity vs. client disconnect</p>
+    <p class="chart-sub">Hover or focus a bar for the exact log timestamps</p>
+    <div class="chart-scroll">
+      <svg class="timeline" viewBox="0 0 900 300" role="img" aria-labelledby="chartDesc">
+        <desc id="chartDesc">
+          Three horizontal bars showing backend run duration out of 30 seconds.
+          Direct connection and Kong Gateway both stop at 3 seconds, matching
+          when the client disconnected. The VS Code tunnel scenario runs the
+          full 30 seconds regardless.
+        </desc>
+
+        <!-- gridlines + axis -->
+        <g>
+          <line class="gridline" x1="180" y1="24"  x2="180" y2="248"></line>
+          <line class="gridline" x1="293" y1="24"  x2="293" y2="248"></line>
+          <line class="gridline" x1="407" y1="24"  x2="407" y2="248"></line>
+          <line class="gridline" x1="520" y1="24"  x2="520" y2="248"></line>
+          <line class="gridline" x1="633" y1="24"  x2="633" y2="248"></line>
+          <line class="gridline" x1="747" y1="24"  x2="747" y2="248"></line>
+          <line class="gridline" x1="860" y1="24"  x2="860" y2="248"></line>
+          <line class="baseline" x1="180" y1="248" x2="860" y2="248"></line>
+
+          <text class="axis-tick" x="180" y="266" text-anchor="middle">0</text>
+          <text class="axis-tick" x="293" y="266" text-anchor="middle">5</text>
+          <text class="axis-tick" x="407" y="266" text-anchor="middle">10</text>
+          <text class="axis-tick" x="520" y="266" text-anchor="middle">15</text>
+          <text class="axis-tick" x="633" y="266" text-anchor="middle">20</text>
+          <text class="axis-tick" x="747" y="266" text-anchor="middle">25</text>
+          <text class="axis-tick" x="860" y="266" text-anchor="middle">30</text>
+          <text class="axis-unit" x="860" y="284" text-anchor="end">seconds since request started</text>
+        </g>
+
+        <!-- disconnect marker at t=3s -->
+        <g>
+          <line class="disc-line" x1="248" y1="18" x2="248" y2="248"></line>
+          <text class="disc-label" x="248" y="13" text-anchor="middle">client disconnects &middot; t = 3s</text>
+        </g>
+
+        <!-- Row 1: Direct connection -->
+        <g class="row-group"
+           tabindex="0"
+           role="button"
+           aria-label="Direct connection: client disconnected at 3 seconds, backend cancelled at 3 seconds"
+           data-title="Direct connection"
+           data-body="Client killed at 13:19:04. Backend logged CANCELLED in the same second &mdash; no orphaned work."
+           data-log="13:19:04  killed curl (direct)&#10;13:19:04  CANCELLED - generator torn down early">
+          <rect class="hit" x="0" y="40" width="900" height="46"></rect>
+          <text class="row-label" x="0" y="58">Direct connection</text>
+          <text class="row-sub" x="0" y="74">curl &rarr; backend</text>
+          <rect class="bar bar-good" x="180" y="52" width="68" height="20" rx="4"></rect>
+          <circle cx="266" cy="62" r="7" fill="var(--good)"></circle>
+          <path d="M262.5 62 l2.5 2.5 l5 -5.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+          <text class="tip-label" x="278" y="66">Stopped instantly at t=3s</text>
+        </g>
+
+        <!-- Row 2: VS Code tunnel -->
+        <g class="row-group"
+           tabindex="0"
+           role="button"
+           aria-label="VS Code port-forward or dev-tunnel: client disconnected at 3 seconds, backend kept running to 30 seconds"
+           data-title="VS Code port-forward / dev-tunnel"
+           data-body="Client killed at 13:19:27. Relay silently drops replies, never closes upstream. Backend runs 27s more, completing all 30 ticks at 13:19:54."
+           data-log="13:19:27  killed curl (through tunnel)&#10;13:19:28..13:19:54  backend keeps ticking&#10;13:19:54  COMPLETED all 30 ticks">
+          <rect class="hit" x="0" y="106" width="900" height="46"></rect>
+          <text class="row-label" x="0" y="124">VS Code port-forward / dev-tunnel</text>
+          <text class="row-sub" x="0" y="140">curl &rarr; relay &rarr; backend</text>
+          <rect class="bar bar-critical" x="180" y="118" width="680" height="20" rx="4"></rect>
+          <circle cx="822" cy="128" r="7" fill="#ffffff"></circle>
+          <path d="M819 125 l6 6 M825 125 l-6 6" stroke="var(--critical)" stroke-width="1.6" stroke-linecap="round"></path>
+          <text class="tip-label-inv" x="806" y="132" text-anchor="end">Ran to full 30s &mdash; 27s orphaned</text>
+        </g>
+
+        <!-- Row 3: Kong Gateway -->
+        <g class="row-group"
+           tabindex="0"
+           role="button"
+           aria-label="Kong Gateway: client disconnected at 3 seconds, backend cancelled at 3 seconds"
+           data-title="Kong Gateway"
+           data-body="Client killed at 13:28:12. Backend logged CANCELLED in the same second &mdash; nginx-based reverse proxy closes upstream on client abort by default."
+           data-log="13:28:12  killed curl (through Kong)&#10;13:28:12  CANCELLED - generator torn down early">
+          <rect class="hit" x="0" y="172" width="900" height="46"></rect>
+          <text class="row-label" x="0" y="190">Kong Gateway</text>
+          <text class="row-sub" x="0" y="206">curl &rarr; Kong :8005 &rarr; backend</text>
+          <rect class="bar bar-good" x="180" y="184" width="68" height="20" rx="4"></rect>
+          <circle cx="266" cy="194" r="7" fill="var(--good)"></circle>
+          <path d="M262.5 194 l2.5 2.5 l5 -5.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+          <text class="tip-label" x="278" y="198">Stopped instantly at t=3s</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="swatch good"></span>Backend stopped when the client disconnected</div>
+      <div class="legend-item"><span class="swatch critical"></span>Backend kept running after the client was gone</div>
+    </div>
+  </section>
+
+  <section class="cards" aria-label="Scenario details">
+    <div class="card scenario-card">
+      <div class="scenario-head">
+        <span class="scenario-name">Direct</span>
+        <span class="chip good"><span class="dot"></span><span class="chip-text">Stopped</span></span>
+      </div>
+      <p class="scenario-why">One physical socket per request. Client FIN/RST reaches uvicorn immediately; Starlette fires <code style="font-family:var(--mono)">http.disconnect</code> and cancels the run.</p>
+      <div class="log">13:19:04  killed curl<br><span class="hit-good">13:19:04  CANCELLED</span> - torn down early</div>
+    </div>
+    <div class="card scenario-card">
+      <div class="scenario-head">
+        <span class="scenario-name">VS Code tunnel</span>
+        <span class="chip critical"><span class="dot"></span><span class="chip-text">Kept running</span></span>
+      </div>
+      <p class="scenario-why">The relay keeps its own connection to the backend alive after the client's side dies &mdash; it just drops what it can't deliver. Uvicorn never sees a disconnect.</p>
+      <div class="log">13:19:27  killed curl<br>13:19:28&hellip;13:19:54  still ticking<br><span class="hit-critical">13:19:54  COMPLETED</span> all 30 ticks</div>
+    </div>
+    <div class="card scenario-card">
+      <div class="scenario-head">
+        <span class="scenario-name">Kong Gateway</span>
+        <span class="chip good"><span class="dot"></span><span class="chip-text">Stopped</span></span>
+      </div>
+      <p class="scenario-why">nginx/OpenResty default (<code style="font-family:var(--mono)">proxy_ignore_client_abort off</code>): closes the upstream leg the moment the client aborts.</p>
+      <div class="log">13:28:12  killed curl<br><span class="hit-good">13:28:12  CANCELLED</span> - torn down early</div>
+    </div>
+  </section>
+
+  <div class="callout card">
+    <p><strong>Takeaway:</strong> cancellation today relies on the transport propagating a TCP disconnect &mdash; true over a direct socket and through Kong, false through the VS Code tunnel. To make it reliable everywhere, add an explicit cancel signal (<code style="font-family:var(--mono)">beforeunload</code> &rarr; <code style="font-family:var(--mono)">/chat/cancel</code>) instead of depending on however the network in between behaves.</p>
+  </div>
+
+  <details class="table-view">
+    <summary>View as table</summary>
+    <div class="table-scroll">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>Scenario</th>
+            <th>Client killed at</th>
+            <th>Backend stopped at</th>
+            <th>Orphaned run time</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Direct connection</td>
+            <td class="num">13:19:04</td>
+            <td class="num">13:19:04</td>
+            <td class="num">0s</td>
+            <td>Stopped</td>
+          </tr>
+          <tr>
+            <td>VS Code port-forward / dev-tunnel</td>
+            <td class="num">13:19:27</td>
+            <td class="num">13:19:54</td>
+            <td class="num">27s</td>
+            <td>Kept running</td>
+          </tr>
+          <tr>
+            <td>Kong Gateway</td>
+            <td class="num">13:28:12</td>
+            <td class="num">13:28:12</td>
+            <td class="num">0s</td>
+            <td>Stopped</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <footer class="page-foot">
+    Full write-up: <code style="font-family:var(--mono)">notes/req_cancel_experiments/client-disconnect-behavior.md</code> &middot;
+    reproduction scripts in the same folder.
+  </footer>
+</div>
+
+<div id="tooltip" role="tooltip"></div>
+
+<script>
+  (function () {
+    var tooltip = document.getElementById('tooltip');
+    var groups = document.querySelectorAll('.row-group');
+
+    function show(el, x, y) {
+      tooltip.innerHTML =
+        '<div class="tt-title">' + el.dataset.title + '</div>' +
+        '<div>' + el.dataset.body + '</div>' +
+        '<div style="margin-top:6px"><code>' + el.dataset.log + '</code></div>';
+      tooltip.style.left = Math.min(x + 16, window.innerWidth - 300) + 'px';
+      tooltip.style.top = Math.max(y - 10, 10) + 'px';
+      tooltip.classList.add('visible');
+    }
+    function hide() {
+      tooltip.classList.remove('visible');
+    }
+
+    groups.forEach(function (g) {
+      g.addEventListener('mousemove', function (e) {
+        show(g, e.clientX, e.clientY);
+      });
+      g.addEventListener('mouseleave', hide);
+      g.addEventListener('focus', function () {
+        var r = g.getBoundingClientRect();
+        show(g, r.left + 40, r.top);
+      });
+      g.addEventListener('blur', hide);
+    });
+  })();
+</script>
