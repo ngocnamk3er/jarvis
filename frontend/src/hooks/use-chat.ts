@@ -170,7 +170,7 @@ async function runStream(body: ReadableStream<Uint8Array>, threadId: string, tar
           break
 
         case "viz":
-          updateMsg((m) => ({ ...m, parts: [...m.parts, { type: "viz" as const, format: event.format, code: event.code, title: event.title }] }))
+          updateMsg((m) => ({ ...m, parts: [...m.parts, { type: "viz" as const, format: event.format, code: event.code, title: event.title, task_run_id: event.task_run_id }] }))
           break
 
         case "todo_update":

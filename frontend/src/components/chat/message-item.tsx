@@ -65,7 +65,9 @@ function splitNestedTools(parts: MessagePart[]): { topLevel: MessagePart[]; byTa
   const topLevel: MessagePart[] = []
   const byTaskRunId = new Map<string, MessagePart[]>()
   for (const part of parts) {
-    const taskRunId = part.type === "tool" ? part.tool.task_run_id : part.type === "todos" ? part.task_run_id : undefined
+    const taskRunId = part.type === "tool" ? part.tool.task_run_id
+      : part.type === "todos" || part.type === "viz" ? part.task_run_id
+      : undefined
     if (taskRunId) {
       const arr = byTaskRunId.get(taskRunId) ?? []
       arr.push(part)
@@ -113,6 +115,17 @@ function renderToolItems(parts: MessagePart[], byTaskRunId: Map<string, MessageP
     }
     if (item.kind === "other" && item.part.type === "todos") {
       return <TodoList key={ri} todos={item.part.todos} />
+    }
+    if (item.kind === "other" && item.part.type === "viz" && item.part.format === "svg") {
+      return (
+        <div key={ri} className="py-1">
+          <div className="flex items-center gap-1.5 mb-2">
+            <BarChart2 className="size-3 text-[#5661f6] shrink-0" />
+            <span className="text-[12px] font-semibold text-gray-600 font-mono">generate_visualization_svg</span>
+          </div>
+          <SvgDiagram code={item.part.code} title={item.part.title} />
+        </div>
+      )
     }
     return null
   })

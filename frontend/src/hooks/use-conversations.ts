@@ -55,7 +55,16 @@ export function useConversations() {
     )
   }, [])
 
+  // The backend already persists last_model as a side effect of /chat/stream
+  // (see chat.py's touch_conversation call) — this just mirrors that locally
+  // so the sidebar/input reflect it immediately, without waiting on a refetch.
+  const setLastModel = useCallback((id: string, modelId: string) => {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, last_model: modelId } : c))
+    )
+  }, [])
+
   useEffect(() => { fetch_() }, [fetch_])
 
-  return { conversations, loading, refetch: fetch_, create, remove, updateTitle }
+  return { conversations, loading, refetch: fetch_, create, remove, updateTitle, setLastModel }
 }

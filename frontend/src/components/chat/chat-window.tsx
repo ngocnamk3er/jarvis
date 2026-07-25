@@ -20,9 +20,17 @@ export function ChatWindow() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const { conversations, create, remove } = useConversations()
+  const { conversations, create, remove, setLastModel } = useConversations()
   const [activeId, setActiveId] = useState<string | null>(null)
-  const pendingContent = useRef<{ content: string; effort: import("@/types/chat").ThinkingEffort } | null>(null)
+  const pendingContent = useRef<{ content: string; effort: import("@/types/chat").ThinkingEffort; model?: import("@/types/chat").Model } | null>(null)
+  // Set synchronously (a ref, not state) the moment a message is sent, so a
+  // brand-new conversation's ChatInput — which remounts as soon as activeId
+  // changes to the newly created id — reads the right model on its very
+  // first render. Waiting on `conversations` state (updated via setLastModel,
+  // which only lands a render later) let ChatInput's own "default the model"
+  // effect fire first with the stale/missing value, flashing DeepSeek Flash
+  // before correcting itself once the state caught up.
+  const lastSentModel = useRef<Map<string, string>>(new Map())
 
   const { messages, isLoading, pendingHitl, interrupted, sendMessage, resumeMessage, clearThread, loadHistory } = useChat(activeId)
   const loadingThreadIds = useLoadingThreadIds()
@@ -48,9 +56,12 @@ export function ChatWindow() {
   // Send pending message after activeId is set (new conversation flow)
   useEffect(() => {
     if (activeId && pendingContent.current) {
-      sendMessage(pendingContent.current.content, pendingContent.current.effort)
+      const { content, effort, model } = pendingContent.current
+      if (model) setLastModel(activeId, model.id)
+      sendMessage(content, effort, model)
       pendingContent.current = null
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, sendMessage])
 
   function activate(id: string | null) {
@@ -77,11 +88,16 @@ export function ChatWindow() {
 
   const handleSend = async (content: string, effort: import("@/types/chat").ThinkingEffort = "high", model?: import("@/types/chat").Model) => {
     if (!activeId) {
-      pendingContent.current = { content, effort }
+      pendingContent.current = { content, effort, model }
       const conv = await create(content.slice(0, 50))
+      if (model) lastSentModel.current.set(conv.id, model.id)
       _historyLoaded.add(conv.id)  // Mark as loaded so we don't fetch history for brand-new thread
       activate(conv.id)
     } else {
+      if (model) {
+        lastSentModel.current.set(activeId, model.id)
+        setLastModel(activeId, model.id)
+      }
       sendMessage(content, effort, model)
     }
   }
@@ -138,9 +154,15 @@ export function ChatWindow() {
           )}
 
           <ChatInput
+            key={activeId}
             onSend={handleSend}
             disabled={isLoading || !!pendingHitl}
             threadId={activeId}
+            initialModelId={
+              (activeId && lastSentModel.current.get(activeId)) ??
+              conversations.find((c) => c.id === activeId)?.last_model ??
+              null
+            }
             onCreateConversation={async () => {
               const conv = await create("New conversation")
               _historyLoaded.add(conv.id)

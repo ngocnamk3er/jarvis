@@ -22,9 +22,13 @@ type Props = {
   disabled: boolean
   threadId: string | null
   onCreateConversation?: () => Promise<string>
+  // Last model actually used for this conversation (persisted server-side —
+  // see touch_conversation in chat.py), so switching back to it shows what
+  // was really used instead of always resetting to the global default.
+  initialModelId?: string | null
 }
 
-export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: Props) {
+export function ChatInput({ onSend, disabled, threadId, onCreateConversation, initialModelId }: Props) {
   const { models } = useModels()
   const [value, setValue] = useState("")
   const [effort, setEffort] = useState<ThinkingEffort>("high")
@@ -121,8 +125,11 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: 
   }, [])
 
   useEffect(() => {
-    if (!model && models.length > 0) setModel(models.find((m) => m.default) ?? models[0])
-  }, [models, model])
+    if (!model && models.length > 0) {
+      const remembered = initialModelId ? models.find((m) => m.id === initialModelId) : undefined
+      setModel(remembered ?? models.find((m) => m.default) ?? models[0])
+    }
+  }, [models, model, initialModelId])
 
   const currentEffort = EFFORT_OPTIONS.find((o) => o.value === effort)!
   const canSend = !disabled && !!model && (value.trim().length > 0 || attachedFiles.length > 0)
@@ -266,6 +273,7 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: 
                             {m.name}
                           </p>
                           <p className="text-[10px] text-gray-400 leading-[14px] mt-0.5">{m.desc}</p>
+                          <p className="text-[10px] text-gray-400 leading-[14px] mt-0.5">{m.size}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-[10px] text-gray-400">in {m.inputPrice}</span>
                             <span className="text-gray-200">·</span>
