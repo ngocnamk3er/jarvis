@@ -65,10 +65,11 @@ function splitNestedTools(parts: MessagePart[]): { topLevel: MessagePart[]; byTa
   const topLevel: MessagePart[] = []
   const byTaskRunId = new Map<string, MessagePart[]>()
   for (const part of parts) {
-    if (part.type === "tool" && part.tool.task_run_id) {
-      const arr = byTaskRunId.get(part.tool.task_run_id) ?? []
+    const taskRunId = part.type === "tool" ? part.tool.task_run_id : part.type === "todos" ? part.task_run_id : undefined
+    if (taskRunId) {
+      const arr = byTaskRunId.get(taskRunId) ?? []
       arr.push(part)
-      byTaskRunId.set(part.tool.task_run_id, arr)
+      byTaskRunId.set(taskRunId, arr)
     } else {
       topLevel.push(part)
     }
@@ -109,6 +110,9 @@ function renderToolItems(parts: MessagePart[], byTaskRunId: Map<string, MessageP
           {renderChildrenFor(part.tool)}
         </ToolBadge>
       )
+    }
+    if (item.kind === "other" && item.part.type === "todos") {
+      return <TodoList key={ri} todos={item.part.todos} />
     }
     return null
   })

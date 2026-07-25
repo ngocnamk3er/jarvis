@@ -74,7 +74,11 @@ Built with `langchain.agents.create_agent` (LangChain/LangGraph v1 + the
   `chat_service.py`) in favor of a dedicated `todo_update` SSE event (the
   tool's input *is* the full new list each call, so it's emitted as-is —
   see `TODO_TOOL` handling in `ToolStartEventHandler`), rendered as a live
-  checklist by `frontend/src/components/chat/todo-list.tsx`.
+  checklist by `frontend/src/components/chat/todo-list.tsx`. The `research`
+  subagent (below) has its own separate `TodoListMiddleware` instance per
+  spawn — its `todo_update` events carry `task_run_id`, which the frontend
+  uses to keep each subagent's checklist nested under its own badge instead
+  of clobbering a single shared one when several subagents run in parallel.
 - `ToolCallLimitMiddleware` (×3) — caps `web_search`/`web_fetch` at 50
   calls/run each, and `task` (subagent spawns) at 5/run — the `task` one uses
   `exit_behavior="continue"` rather than `"end"` like the others, since a
@@ -83,9 +87,10 @@ Built with `langchain.agents.create_agent` (LangChain/LangGraph v1 + the
 - `SubAgentMiddleware` — exposes a `task` tool that delegates to the
   `research` subagent ([backend/app/agents/subagents.py](backend/app/agents/subagents.py)),
   which has its own `bash` (gated by its own `HumanInTheLoopMiddleware`, added
-  automatically from `interrupt_on` on the `SubAgent` spec) and its own
-  per-instance `ToolCallLimitMiddleware`s — independent of, and in addition
-  to, the main agent's `task` limiter above
+  automatically from `interrupt_on` on the `SubAgent` spec), its own
+  `TodoListMiddleware`, and its own per-instance `ToolCallLimitMiddleware`s —
+  all independent of, and in addition to, the main agent's `task` limiter
+  above
 
 The model is `ThinkingChatOpenAI` ([backend/app/agents/llm.py](backend/app/agents/llm.py)), a `ChatOpenAI`
 subclass that reads `thinking_effort` and `model` out of LangGraph's

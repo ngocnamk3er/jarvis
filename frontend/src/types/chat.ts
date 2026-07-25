@@ -42,7 +42,10 @@ export type MessagePart =
   | { type: "tool"; tool: ToolCall }
   | { type: "thinking"; content: string; isStreaming?: boolean }
   | { type: "viz"; format: "svg"; code: string; title?: string }
-  | { type: "todos"; todos: Todo[] }
+  // task_run_id set when this todo list belongs to a subagent's own
+  // planning state (nested under that subagent's badge) rather than the
+  // main agent's own todos.
+  | { type: "todos"; todos: Todo[]; task_run_id?: string }
 
 export type TokenUsage = {
   input_tokens: number
@@ -84,7 +87,7 @@ export type StreamEvent =
   | { type: "tool_start"; name: string; label?: string; input?: unknown; run_id?: string; task_run_id?: string }
   | { type: "tool_end"; name: string; output: string; run_id?: string; task_run_id?: string }
   | { type: "viz"; format: "svg"; code: string; title?: string }
-  | { type: "todo_update"; todos: Todo[] }
+  | { type: "todo_update"; todos: Todo[]; task_run_id?: string }
   | { type: "hitl_request"; actions: HitlAction[]; review_configs: HitlReviewConfig[] }
   | ({ type: "usage" } & TokenUsage)
   | { type: "done" }

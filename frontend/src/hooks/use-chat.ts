@@ -176,8 +176,11 @@ async function runStream(body: ReadableStream<Uint8Array>, threadId: string, tar
         case "todo_update":
           updateMsg((m) => {
             const parts = [...m.parts]
-            const idx = parts.findIndex((p) => p.type === "todos")
-            const todosPart = { type: "todos" as const, todos: event.todos }
+            // Match on task_run_id too — parallel subagents each keep their
+            // own todo list, so a bare `type === "todos"` match would let
+            // them clobber each other's widget instead of updating in place.
+            const idx = parts.findIndex((p) => p.type === "todos" && p.task_run_id === event.task_run_id)
+            const todosPart = { type: "todos" as const, todos: event.todos, task_run_id: event.task_run_id }
             if (idx !== -1) parts[idx] = todosPart
             else parts.push(todosPart)
             return { ...m, parts }
