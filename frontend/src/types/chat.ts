@@ -97,6 +97,7 @@ export type Conversation = {
   id: string
   title: string
   last_model: string | null
+  last_subagent_model: string | null
   created_at: string
   updated_at: string
 }

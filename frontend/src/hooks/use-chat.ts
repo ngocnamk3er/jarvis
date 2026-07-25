@@ -276,7 +276,7 @@ export function useChat(threadId: string | null) {
   }, [])
 
   const sendMessage = useCallback(
-    async (content: string, thinking_effort: ThinkingEffort = "high", model?: Model) => {
+    async (content: string, thinking_effort: ThinkingEffort = "high", model?: Model, subagentModel?: Model) => {
       if (!threadId) return
       _hitl.set(threadId, null)
       _interrupted.set(threadId, false)
@@ -290,7 +290,13 @@ export function useChat(threadId: string | null) {
       const res = await fetch(`${API_URL}/api/v1/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ thread_id: threadId, content, thinking_effort, model: model?.id }),
+        body: JSON.stringify({
+          thread_id: threadId,
+          content,
+          thinking_effort,
+          model: model?.id,
+          subagent_model: subagentModel?.id,
+        }),
       }).catch(() => null)
 
       if (!res?.body) {
@@ -306,7 +312,7 @@ export function useChat(threadId: string | null) {
   )
 
   const resumeMessage = useCallback(
-    async (decision: "approve" | "reject", model?: Model) => {
+    async (decision: "approve" | "reject", model?: Model, subagentModel?: Model) => {
       if (!threadId) return
       const msgs = _msgs.get(threadId) ?? []
       let resumeId = ""
@@ -336,7 +342,12 @@ export function useChat(threadId: string | null) {
       const res = await fetch(`${API_URL}/api/v1/chat/resume`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ thread_id: threadId, decision, model: model?.id }),
+        body: JSON.stringify({
+          thread_id: threadId,
+          decision,
+          model: model?.id,
+          subagent_model: subagentModel?.id,
+        }),
       }).catch(() => null)
 
       if (!res?.body) {

@@ -21,10 +21,15 @@ export function ChatWindow() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const { conversations, create, remove, setLastModel } = useConversations()
+  const { conversations, create, remove, setLastModel, setLastSubagentModel } = useConversations()
   const { models } = useModels()
   const [activeId, setActiveId] = useState<string | null>(null)
-  const pendingContent = useRef<{ content: string; effort: import("@/types/chat").ThinkingEffort; model?: import("@/types/chat").Model } | null>(null)
+  const pendingContent = useRef<{
+    content: string
+    effort: import("@/types/chat").ThinkingEffort
+    model?: import("@/types/chat").Model
+    subagentModel?: import("@/types/chat").Model
+  } | null>(null)
   // Set synchronously (a ref, not state) the moment a message is sent, so a
   // brand-new conversation's ChatInput — which remounts as soon as activeId
   // changes to the newly created id — reads the right model on its very
@@ -33,6 +38,7 @@ export function ChatWindow() {
   // effect fire first with the stale/missing value, flashing DeepSeek Flash
   // before correcting itself once the state caught up.
   const lastSentModel = useRef<Map<string, string>>(new Map())
+  const lastSentSubagentModel = useRef<Map<string, string>>(new Map())
 
   const { messages, isLoading, pendingHitl, interrupted, sendMessage, resumeMessage, clearThread, loadHistory } = useChat(activeId)
   const loadingThreadIds = useLoadingThreadIds()
@@ -58,9 +64,10 @@ export function ChatWindow() {
   // Send pending message after activeId is set (new conversation flow)
   useEffect(() => {
     if (activeId && pendingContent.current) {
-      const { content, effort, model } = pendingContent.current
+      const { content, effort, model, subagentModel } = pendingContent.current
       if (model) setLastModel(activeId, model.id)
-      sendMessage(content, effort, model)
+      if (subagentModel) setLastSubagentModel(activeId, subagentModel.id)
+      sendMessage(content, effort, model, subagentModel)
       pendingContent.current = null
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,11 +95,17 @@ export function ChatWindow() {
     }
   }
 
-  const handleSend = async (content: string, effort: import("@/types/chat").ThinkingEffort = "high", model?: import("@/types/chat").Model) => {
+  const handleSend = async (
+    content: string,
+    effort: import("@/types/chat").ThinkingEffort = "high",
+    model?: import("@/types/chat").Model,
+    subagentModel?: import("@/types/chat").Model
+  ) => {
     if (!activeId) {
-      pendingContent.current = { content, effort, model }
+      pendingContent.current = { content, effort, model, subagentModel }
       const conv = await create(content.slice(0, 50))
       if (model) lastSentModel.current.set(conv.id, model.id)
+      if (subagentModel) lastSentSubagentModel.current.set(conv.id, subagentModel.id)
       _historyLoaded.add(conv.id)  // Mark as loaded so we don't fetch history for brand-new thread
       activate(conv.id)
     } else {
@@ -100,7 +113,11 @@ export function ChatWindow() {
         lastSentModel.current.set(activeId, model.id)
         setLastModel(activeId, model.id)
       }
-      sendMessage(content, effort, model)
+      if (subagentModel) {
+        lastSentSubagentModel.current.set(activeId, subagentModel.id)
+        setLastSubagentModel(activeId, subagentModel.id)
+      }
+      sendMessage(content, effort, model, subagentModel)
     }
   }
 
@@ -112,6 +129,12 @@ export function ChatWindow() {
     conversations.find((c) => c.id === activeId)?.last_model ??
     null
   const resumeModel = models.find((m) => m.id === resumeModelId)
+
+  const resumeSubagentModelId =
+    (activeId && lastSentSubagentModel.current.get(activeId)) ??
+    conversations.find((c) => c.id === activeId)?.last_subagent_model ??
+    null
+  const resumeSubagentModel = models.find((m) => m.id === resumeSubagentModelId)
 
   const handleRetry = () => {
     const lastUser = [...messages].reverse().find((m) => m.role === "user")
@@ -144,8 +167,8 @@ export function ChatWindow() {
           {pendingHitl && !isLoading && (
             <HitlApproval
               hitl={pendingHitl}
-              onApprove={() => resumeMessage("approve", resumeModel)}
-              onReject={() => resumeMessage("reject", resumeModel)}
+              onApprove={() => resumeMessage("approve", resumeModel, resumeSubagentModel)}
+              onReject={() => resumeMessage("reject", resumeModel, resumeSubagentModel)}
             />
           )}
 
@@ -172,6 +195,11 @@ export function ChatWindow() {
             initialModelId={
               (activeId && lastSentModel.current.get(activeId)) ??
               conversations.find((c) => c.id === activeId)?.last_model ??
+              null
+            }
+            initialSubagentModelId={
+              (activeId && lastSentSubagentModel.current.get(activeId)) ??
+              conversations.find((c) => c.id === activeId)?.last_subagent_model ??
               null
             }
             onCreateConversation={async () => {

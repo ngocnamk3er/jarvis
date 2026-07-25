@@ -64,7 +64,13 @@ export function useConversations() {
     )
   }, [])
 
+  const setLastSubagentModel = useCallback((id: string, modelId: string) => {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, last_subagent_model: modelId } : c))
+    )
+  }, [])
+
   useEffect(() => { fetch_() }, [fetch_])
 
-  return { conversations, loading, refetch: fetch_, create, remove, updateTitle, setLastModel }
+  return { conversations, loading, refetch: fetch_, create, remove, updateTitle, setLastModel, setLastSubagentModel }
 }
