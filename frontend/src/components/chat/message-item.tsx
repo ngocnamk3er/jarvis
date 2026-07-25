@@ -12,6 +12,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { Message, MessagePart, ToolCall, TokenUsage } from "@/types/chat"
 import { ToolBadge, ToolGroupBadge } from "./tool-badge"
+import { TodoList } from "./todo-list"
 import { extractFilesFromMessage, FileChips, GeneratedFile } from "./file-tray"
 
 const SvgDiagram = dynamic(
@@ -302,6 +303,10 @@ export function MessageItem({
 
           if (part.type === "thinking") {
             return <ThinkingBlock key={ri} content={part.content} isStreaming={part.isStreaming} />
+          }
+
+          if (part.type === "todos") {
+            return <TodoList key={ri} todos={part.todos} />
           }
 
           if (part.type === "viz") {

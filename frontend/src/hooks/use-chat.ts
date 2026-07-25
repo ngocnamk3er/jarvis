@@ -173,6 +173,17 @@ async function runStream(body: ReadableStream<Uint8Array>, threadId: string, tar
           updateMsg((m) => ({ ...m, parts: [...m.parts, { type: "viz" as const, format: event.format, code: event.code, title: event.title }] }))
           break
 
+        case "todo_update":
+          updateMsg((m) => {
+            const parts = [...m.parts]
+            const idx = parts.findIndex((p) => p.type === "todos")
+            const todosPart = { type: "todos" as const, todos: event.todos }
+            if (idx !== -1) parts[idx] = todosPart
+            else parts.push(todosPart)
+            return { ...m, parts }
+          })
+          break
+
         case "usage":
           updateMsg((m) => ({
             ...m,

@@ -52,7 +52,7 @@ returns a `StreamingResponse` wrapping `chat_service.stream(...)`
 agent (`app.state.graph`, built once at startup in `main.py`) via
 `graph.astream_events(...)` and translates LangGraph's event stream into a
 custom SSE protocol: `token`, `thinking_token`, `tool_start`, `tool_end`,
-`tool_chunk`, `viz`, `usage`, `hitl_request`, `done`, `error`. The frontend's
+`tool_chunk`, `viz`, `todo_update`, `usage`, `hitl_request`, `done`, `error`. The frontend's
 `use-chat.ts` hook is the sole consumer of this protocol — any new event type
 must be added on both sides.
 
@@ -69,11 +69,23 @@ Built with `langchain.agents.create_agent` (LangChain/LangGraph v1 + the
 `deepagents` package). Middleware stack, in order:
 - `SummarizationMiddleware` — trims history once a thread exceeds 60k tokens
 - `HumanInTheLoopMiddleware` — requires approve/reject on every `bash` call
-- `TodoListMiddleware` — gives the model a `write_todos` tool (hidden from the
-  SSE stream — see `HIDDEN_TOOLS` in `chat_service.py`)
-- `ToolCallLimitMiddleware` (×2) — caps `web_search`/`web_fetch` at 50 calls/run
+- `TodoListMiddleware` — gives the model a `write_todos` tool. Its raw
+  `tool_start`/`tool_end` are suppressed (see `HIDDEN_TOOLS` in
+  `chat_service.py`) in favor of a dedicated `todo_update` SSE event (the
+  tool's input *is* the full new list each call, so it's emitted as-is —
+  see `TODO_TOOL` handling in `ToolStartEventHandler`), rendered as a live
+  checklist by `frontend/src/components/chat/todo-list.tsx`.
+- `ToolCallLimitMiddleware` (×3) — caps `web_search`/`web_fetch` at 50
+  calls/run each, and `task` (subagent spawns) at 5/run — the `task` one uses
+  `exit_behavior="continue"` rather than `"end"` like the others, since a
+  burst that also calls other tools alongside the blocked `task` calls would
+  otherwise raise `NotImplementedError`
 - `SubAgentMiddleware` — exposes a `task` tool that delegates to the
-  `research` subagent ([backend/app/agents/subagents.py](backend/app/agents/subagents.py))
+  `research` subagent ([backend/app/agents/subagents.py](backend/app/agents/subagents.py)),
+  which has its own `bash` (gated by its own `HumanInTheLoopMiddleware`, added
+  automatically from `interrupt_on` on the `SubAgent` spec) and its own
+  per-instance `ToolCallLimitMiddleware`s — independent of, and in addition
+  to, the main agent's `task` limiter above
 
 The model is `ThinkingChatOpenAI` ([backend/app/agents/llm.py](backend/app/agents/llm.py)), a `ChatOpenAI`
 subclass that reads `thinking_effort` and `model` out of LangGraph's
@@ -100,6 +112,20 @@ checks `graph.aget_state(config).interrupts` after the stream ends and emits
 a `hitl_request` SSE event. The frontend resolves it via
 `POST /api/v1/chat/resume`, which sends `Command(resume={"decisions": [...]})`
 back into the same thread.
+
+This also works when the interrupt originates *inside* a subagent (e.g. the
+`research` subagent's own gated `bash` — see above): the interrupt raised
+inside the `task` tool's nested `subagent.invoke()` still propagates all the
+way to the main graph's `state.interrupts` in the same
+`{"action_requests": ..., "review_configs": ...}` shape, verified live —
+no special-casing needed in `chat_service.py` for nested vs. top-level.
+
+One non-obvious LangGraph behavior this surfaces: resuming an interrupt
+**re-executes that tool node from scratch** with a brand-new `run_id` (not a
+continuation of the original call) — verified via a live `astream_events`
+trace. `use-chat.ts`'s `resumeMessage` accounts for this by resolving any
+still-`running`/`streaming` tool badges to `done` before the resume stream
+starts, since their original `run_id` will never get a matching `tool_end`.
 
 ### Sandbox execution
 The `bash` tool ([backend/app/agents/tools/bash.py](backend/app/agents/tools/bash.py)) runs inside a
