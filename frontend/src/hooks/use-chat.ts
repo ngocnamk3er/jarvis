@@ -302,7 +302,21 @@ export function useChat(threadId: string | null) {
       if (!resumeId) return
 
       _hitl.set(threadId, null)
-      _msgs.set(threadId, msgs.map(m => m.id === resumeId ? { ...m, isStreaming: true } : m))
+      _msgs.set(threadId, msgs.map(m => {
+        if (m.id !== resumeId) return m
+        // Resuming re-executes the interrupted tool call from scratch with a
+        // fresh run_id (LangGraph replays the whole node, not just what's left
+        // of it) — so its original tool_start will never get a matching
+        // tool_end from this new stream. Resolve any still-running/streaming
+        // badges now so they don't spin forever; the resume stream then adds
+        // its own fresh badge for the retried call.
+        const parts = m.parts.map(p =>
+          p.type === "tool" && p.tool.status !== "done"
+            ? { ...p, tool: { ...p.tool, status: "done" as const } }
+            : p
+        )
+        return { ...m, parts, isStreaming: true }
+      }))
       _notify(threadId)
 
       const res = await fetch(`${API_URL}/api/v1/chat/resume`, {
