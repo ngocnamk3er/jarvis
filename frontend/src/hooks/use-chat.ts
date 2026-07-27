@@ -170,7 +170,21 @@ async function runStream(body: ReadableStream<Uint8Array>, threadId: string, tar
           break
 
         case "viz":
-          updateMsg((m) => ({ ...m, parts: [...m.parts, { type: "viz" as const, format: event.format, code: event.code, title: event.title }] }))
+          updateMsg((m) => ({ ...m, parts: [...m.parts, { type: "viz" as const, format: event.format, code: event.code, title: event.title, task_run_id: event.task_run_id }] }))
+          break
+
+        case "todo_update":
+          updateMsg((m) => {
+            const parts = [...m.parts]
+            // Match on task_run_id too — parallel subagents each keep their
+            // own todo list, so a bare `type === "todos"` match would let
+            // them clobber each other's widget instead of updating in place.
+            const idx = parts.findIndex((p) => p.type === "todos" && p.task_run_id === event.task_run_id)
+            const todosPart = { type: "todos" as const, todos: event.todos, task_run_id: event.task_run_id }
+            if (idx !== -1) parts[idx] = todosPart
+            else parts.push(todosPart)
+            return { ...m, parts }
+          })
           break
 
         case "usage":
@@ -262,7 +276,7 @@ export function useChat(threadId: string | null) {
   }, [])
 
   const sendMessage = useCallback(
-    async (content: string, thinking_effort: ThinkingEffort = "high", model?: Model) => {
+    async (content: string, thinking_effort: ThinkingEffort = "high", model?: Model, subagentModel?: Model) => {
       if (!threadId) return
       _hitl.set(threadId, null)
       _interrupted.set(threadId, false)
@@ -276,7 +290,13 @@ export function useChat(threadId: string | null) {
       const res = await fetch(`${API_URL}/api/v1/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ thread_id: threadId, content, thinking_effort, model: model?.id }),
+        body: JSON.stringify({
+          thread_id: threadId,
+          content,
+          thinking_effort,
+          model: model?.id,
+          subagent_model: subagentModel?.id,
+        }),
       }).catch(() => null)
 
       if (!res?.body) {
@@ -292,7 +312,7 @@ export function useChat(threadId: string | null) {
   )
 
   const resumeMessage = useCallback(
-    async (decision: "approve" | "reject") => {
+    async (decision: "approve" | "reject", model?: Model, subagentModel?: Model) => {
       if (!threadId) return
       const msgs = _msgs.get(threadId) ?? []
       let resumeId = ""
@@ -302,13 +322,32 @@ export function useChat(threadId: string | null) {
       if (!resumeId) return
 
       _hitl.set(threadId, null)
-      _msgs.set(threadId, msgs.map(m => m.id === resumeId ? { ...m, isStreaming: true } : m))
+      _msgs.set(threadId, msgs.map(m => {
+        if (m.id !== resumeId) return m
+        // Resuming re-executes the interrupted tool call from scratch with a
+        // fresh run_id (LangGraph replays the whole node, not just what's left
+        // of it) — so its original tool_start will never get a matching
+        // tool_end from this new stream. Resolve any still-running/streaming
+        // badges now so they don't spin forever; the resume stream then adds
+        // its own fresh badge for the retried call.
+        const parts = m.parts.map(p =>
+          p.type === "tool" && p.tool.status !== "done"
+            ? { ...p, tool: { ...p.tool, status: "done" as const } }
+            : p
+        )
+        return { ...m, parts, isStreaming: true }
+      }))
       _notify(threadId)
 
       const res = await fetch(`${API_URL}/api/v1/chat/resume`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ thread_id: threadId, decision }),
+        body: JSON.stringify({
+          thread_id: threadId,
+          decision,
+          model: model?.id,
+          subagent_model: subagentModel?.id,
+        }),
       }).catch(() => null)
 
       if (!res?.body) {

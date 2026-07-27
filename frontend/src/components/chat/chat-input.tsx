@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react"
-import { SendHorizontal, Loader2, Brain, ChevronDown, Check, Cpu, Paperclip, X, File } from "lucide-react"
+import { SendHorizontal, Loader2, Brain, ChevronDown, Check, Cpu, Bot, Paperclip, X, File } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThinkingEffort, Model } from "@/types/chat"
 import { useModels } from "@/hooks/use-models"
@@ -18,25 +18,37 @@ const EFFORT_OPTIONS: { value: ThinkingEffort; label: string; desc: string }[] =
 type AttachedFile = { name: string; virtualPath: string }
 
 type Props = {
-  onSend: (content: string, effort: ThinkingEffort, model: Model) => void
+  onSend: (content: string, effort: ThinkingEffort, model: Model, subagentModel?: Model) => void
   disabled: boolean
   threadId: string | null
   onCreateConversation?: () => Promise<string>
+  // Last model actually used for this conversation (persisted server-side —
+  // see touch_conversation in chat.py), so switching back to it shows what
+  // was really used instead of always resetting to the global default.
+  initialModelId?: string | null
+  // Last model the research subagent actually used for this conversation.
+  // null/unset means "inherit the main model" — the backend already does
+  // this by default (LangGraph merges the root run's config into the
+  // subagent's), so leaving this unset is not a degraded state.
+  initialSubagentModelId?: string | null
 }
 
-export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: Props) {
+export function ChatInput({ onSend, disabled, threadId, onCreateConversation, initialModelId, initialSubagentModelId }: Props) {
   const { models } = useModels()
   const [value, setValue] = useState("")
   const [effort, setEffort] = useState<ThinkingEffort>("high")
   const [model, setModel] = useState<Model | null>(null)
+  const [subagentModel, setSubagentModel] = useState<Model | null>(null)
   const [effortOpen, setEffortOpen] = useState(false)
   const [modelOpen, setModelOpen] = useState(false)
+  const [subagentModelOpen, setSubagentModelOpen] = useState(false)
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
   const [uploading, setUploading] = useState(false)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const effortRef = useRef<HTMLDivElement>(null)
   const modelRef = useRef<HTMLDivElement>(null)
+  const subagentModelRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const resize = () => {
@@ -56,7 +68,7 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: 
       content = trimmed ? `${trimmed}\n\n${fileList}` : fileList
     }
 
-    onSend(content, effort, model)
+    onSend(content, effort, model, subagentModel ?? undefined)
     setValue("")
     setAttachedFiles([])
     if (textareaRef.current) textareaRef.current.style.height = "auto"
@@ -115,14 +127,32 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: 
     const handler = (e: MouseEvent) => {
       if (effortRef.current && !effortRef.current.contains(e.target as Node)) setEffortOpen(false)
       if (modelRef.current && !modelRef.current.contains(e.target as Node)) setModelOpen(false)
+      if (subagentModelRef.current && !subagentModelRef.current.contains(e.target as Node)) setSubagentModelOpen(false)
     }
     document.addEventListener("mousedown", handler)
     return () => document.removeEventListener("mousedown", handler)
   }, [])
 
   useEffect(() => {
-    if (!model && models.length > 0) setModel(models.find((m) => m.default) ?? models[0])
-  }, [models, model])
+    if (!model && models.length > 0) {
+      const remembered = initialModelId ? models.find((m) => m.id === initialModelId) : undefined
+      setModel(remembered ?? models.find((m) => m.default) ?? models[0])
+    }
+  }, [models, model, initialModelId])
+
+  // Ref (not state) so a user explicitly picking "Same as main model" back
+  // to null doesn't get immediately overwritten by this effect re-firing —
+  // it should only apply the remembered value once, on initial mount.
+  const subagentModelInitialized = useRef(false)
+  useEffect(() => {
+    if (!subagentModelInitialized.current && initialSubagentModelId && models.length > 0) {
+      const remembered = models.find((m) => m.id === initialSubagentModelId)
+      if (remembered) {
+        setSubagentModel(remembered)
+        subagentModelInitialized.current = true
+      }
+    }
+  }, [models, initialSubagentModelId])
 
   const currentEffort = EFFORT_OPTIONS.find((o) => o.value === effort)!
   const canSend = !disabled && !!model && (value.trim().length > 0 || attachedFiles.length > 0)
@@ -266,6 +296,7 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: 
                             {m.name}
                           </p>
                           <p className="text-[10px] text-gray-400 leading-[14px] mt-0.5">{m.desc}</p>
+                          <p className="text-[10px] text-gray-400 leading-[14px] mt-0.5">{m.size}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-[10px] text-gray-400">in {m.inputPrice}</span>
                             <span className="text-gray-200">·</span>
@@ -275,6 +306,80 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation }: 
                           </div>
                         </div>
                         {m.id === model?.id && (
+                          <Check className="size-3 text-[#5661f6] shrink-0 mt-0.5" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Subagent model selector */}
+              <div ref={subagentModelRef} className="relative">
+                <button
+                  onClick={() => { setSubagentModelOpen((o) => !o); setEffortOpen(false); setModelOpen(false) }}
+                  title="Model used by the research subagent"
+                  className="flex items-center gap-1.5 bg-[#EEF0FF] hover:bg-[#E4E7FF] transition-colors rounded-full px-2.5 py-1"
+                >
+                  <Bot className="size-3 text-[#5661f6] shrink-0" />
+                  <span className="text-[11px] font-semibold text-[#5661f6]">{subagentModel?.name ?? "Same as main"}</span>
+                  <ChevronDown
+                    className="size-2.5 text-[#5661f6] transition-transform duration-150"
+                    style={{ transform: subagentModelOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                  />
+                </button>
+
+                {subagentModelOpen && (
+                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-2xl shadow-lg border border-gray-100 py-1 z-10">
+                    <button
+                      onClick={() => { setSubagentModel(null); setSubagentModelOpen(false) }}
+                      className={cn(
+                        "w-full flex items-start gap-2.5 px-3 py-2 hover:bg-gray-50 transition-colors text-left",
+                        !subagentModel && "bg-[#EEF0FF] hover:bg-[#E4E7FF]"
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          "text-[12px] font-semibold leading-[16px]",
+                          !subagentModel ? "text-[#5661f6]" : "text-gray-700"
+                        )}>
+                          Same as main model
+                        </p>
+                        <p className="text-[10px] text-gray-400 leading-[14px] mt-0.5">
+                          Subagent follows whichever model is selected above
+                        </p>
+                      </div>
+                      {!subagentModel && (
+                        <Check className="size-3 text-[#5661f6] shrink-0 mt-0.5" />
+                      )}
+                    </button>
+                    {models.map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => { setSubagentModel(m); setSubagentModelOpen(false) }}
+                        className={cn(
+                          "w-full flex items-start gap-2.5 px-3 py-2 hover:bg-gray-50 transition-colors text-left",
+                          m.id === subagentModel?.id && "bg-[#EEF0FF] hover:bg-[#E4E7FF]"
+                        )}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className={cn(
+                            "text-[12px] font-semibold leading-[16px]",
+                            m.id === subagentModel?.id ? "text-[#5661f6]" : "text-gray-700"
+                          )}>
+                            {m.name}
+                          </p>
+                          <p className="text-[10px] text-gray-400 leading-[14px] mt-0.5">{m.desc}</p>
+                          <p className="text-[10px] text-gray-400 leading-[14px] mt-0.5">{m.size}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-gray-400">in {m.inputPrice}</span>
+                            <span className="text-gray-200">·</span>
+                            <span className="text-[10px] text-gray-400">out {m.outputPrice}</span>
+                            <span className="text-gray-200">·</span>
+                            <span className="text-[10px] text-gray-400">{m.context} ctx</span>
+                          </div>
+                        </div>
+                        {m.id === subagentModel?.id && (
                           <Check className="size-3 text-[#5661f6] shrink-0 mt-0.5" />
                         )}
                       </button>

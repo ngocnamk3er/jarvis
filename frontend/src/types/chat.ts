@@ -9,6 +9,7 @@ export type Model = {
   inputPrice: string
   outputPrice: string
   context: string
+  size: string
   default?: boolean
 }
 
@@ -30,11 +31,21 @@ export type ToolCall = {
   task_run_id?: string
 }
 
+export type TodoStatus = "pending" | "in_progress" | "completed"
+
+export type Todo = {
+  content: string
+  status: TodoStatus
+}
+
 export type MessagePart =
   | { type: "text"; content: string }
   | { type: "tool"; tool: ToolCall }
   | { type: "thinking"; content: string; isStreaming?: boolean }
-  | { type: "viz"; format: "svg"; code: string; title?: string }
+  // task_run_id set when this belongs to a subagent's own tool loop (nested
+  // under that subagent's badge) rather than the main agent's own turn.
+  | { type: "viz"; format: "svg"; code: string; title?: string; task_run_id?: string }
+  | { type: "todos"; todos: Todo[]; task_run_id?: string }
 
 export type TokenUsage = {
   input_tokens: number
@@ -75,7 +86,8 @@ export type StreamEvent =
   | { type: "tool_chunk"; index: number; name: string; args_delta: string }
   | { type: "tool_start"; name: string; label?: string; input?: unknown; run_id?: string; task_run_id?: string }
   | { type: "tool_end"; name: string; output: string; run_id?: string; task_run_id?: string }
-  | { type: "viz"; format: "svg"; code: string; title?: string }
+  | { type: "viz"; format: "svg"; code: string; title?: string; task_run_id?: string }
+  | { type: "todo_update"; todos: Todo[]; task_run_id?: string }
   | { type: "hitl_request"; actions: HitlAction[]; review_configs: HitlReviewConfig[] }
   | ({ type: "usage" } & TokenUsage)
   | { type: "done" }
@@ -84,6 +96,8 @@ export type StreamEvent =
 export type Conversation = {
   id: string
   title: string
+  last_model: string | null
+  last_subagent_model: string | null
   created_at: string
   updated_at: string
 }

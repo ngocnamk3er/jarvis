@@ -12,6 +12,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { Message, MessagePart, ToolCall, TokenUsage } from "@/types/chat"
 import { ToolBadge, ToolGroupBadge } from "./tool-badge"
+import { TodoList } from "./todo-list"
 import { extractFilesFromMessage, FileChips, GeneratedFile } from "./file-tray"
 
 const SvgDiagram = dynamic(
@@ -64,10 +65,13 @@ function splitNestedTools(parts: MessagePart[]): { topLevel: MessagePart[]; byTa
   const topLevel: MessagePart[] = []
   const byTaskRunId = new Map<string, MessagePart[]>()
   for (const part of parts) {
-    if (part.type === "tool" && part.tool.task_run_id) {
-      const arr = byTaskRunId.get(part.tool.task_run_id) ?? []
+    const taskRunId = part.type === "tool" ? part.tool.task_run_id
+      : part.type === "todos" || part.type === "viz" ? part.task_run_id
+      : undefined
+    if (taskRunId) {
+      const arr = byTaskRunId.get(taskRunId) ?? []
       arr.push(part)
-      byTaskRunId.set(part.tool.task_run_id, arr)
+      byTaskRunId.set(taskRunId, arr)
     } else {
       topLevel.push(part)
     }
@@ -107,6 +111,20 @@ function renderToolItems(parts: MessagePart[], byTaskRunId: Map<string, MessageP
         <ToolBadge key={ri} tool={part.tool} autoCollapsed={autoCollapsed}>
           {renderChildrenFor(part.tool)}
         </ToolBadge>
+      )
+    }
+    if (item.kind === "other" && item.part.type === "todos") {
+      return <TodoList key={ri} todos={item.part.todos} />
+    }
+    if (item.kind === "other" && item.part.type === "viz" && item.part.format === "svg") {
+      return (
+        <div key={ri} className="py-1">
+          <div className="flex items-center gap-1.5 mb-2">
+            <BarChart2 className="size-3 text-[#5661f6] shrink-0" />
+            <span className="text-[12px] font-semibold text-gray-600 font-mono">generate_visualization_svg</span>
+          </div>
+          <SvgDiagram code={item.part.code} title={item.part.title} />
+        </div>
       )
     }
     return null
@@ -302,6 +320,10 @@ export function MessageItem({
 
           if (part.type === "thinking") {
             return <ThinkingBlock key={ri} content={part.content} isStreaming={part.isStreaming} />
+          }
+
+          if (part.type === "todos") {
+            return <TodoList key={ri} todos={part.todos} />
           }
 
           if (part.type === "viz") {

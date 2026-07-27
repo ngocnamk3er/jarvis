@@ -127,6 +127,42 @@ function OutputBlock({ output }: { output: string }) {
   )
 }
 
+// A subagent's own card in the horizontal row (see ToolGroupBadge below) —
+// unlike ToolBadge, it has no collapse state of its own: the outer group
+// toggle shows/hides the whole row, each card always renders expanded.
+function SubagentCard({ tool, children }: { tool: ToolCall; children?: React.ReactNode }) {
+  const input = tool.input as { subagent_type?: string; description?: string } | undefined
+  const isRunning = tool.status === "running" || tool.status === "streaming"
+
+  return (
+    <div
+      className="flex-none w-[260px] rounded-xl border border-[#E0E7FF] bg-white flex flex-col overflow-hidden"
+      style={{ maxHeight: "380px" }}
+    >
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-[#E0E7FF] bg-[#F7F8FF] shrink-0">
+        {isRunning
+          ? <Loader2 className="size-3 animate-spin text-[#5661f6] shrink-0" />
+          : <Bot className="size-3 text-[#5661f6] shrink-0" />
+        }
+        <span className="text-[12px] font-semibold text-gray-700 truncate">
+          {input?.subagent_type ?? "sub-agent"}
+        </span>
+      </div>
+      {input?.description && (
+        <div className="px-3 pt-2 text-[11px] leading-[15px] text-gray-400 shrink-0" style={{
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+        }}>
+          {input.description}
+        </div>
+      )}
+      <div className="px-3 py-2.5 space-y-2 overflow-y-auto flex-1 min-h-0">
+        {children}
+        {tool.status === "done" && tool.output !== undefined && <OutputBlock output={tool.output} />}
+      </div>
+    </div>
+  )
+}
+
 // ── Group Badge (multiple parallel tools) ─────────────────────────────────
 export function ToolGroupBadge({
   tools,
@@ -147,11 +183,17 @@ export function ToolGroupBadge({
 
   const allDone = tools.every((t) => t.status === "done")
   const anyRunning = tools.some((t) => t.status === "running" || t.status === "streaming")
+  // 2+ parallel `task` calls (subagent spawns) get a side-by-side card row
+  // instead of the generic stacked-badge list — each subagent's own progress
+  // (todos, nested tool calls) is easier to compare at a glance that way.
+  const isSubagentGroup = tools.length >= 2 && tools.every((t) => t.name === "task")
 
   const labels = tools.map((t) => t.label || getMeta(t.name).label).filter(Boolean)
-  const headerLabel = labels.length > 0
-    ? labels.join("  ·  ")
-    : `${tools.length} tools`
+  const headerLabel = isSubagentGroup
+    ? `Delegating to ${tools.length} sub-agents`
+    : labels.length > 0
+      ? labels.join("  ·  ")
+      : `${tools.length} tools`
 
   return (
     <div className="py-1">
@@ -173,13 +215,23 @@ export function ToolGroupBadge({
       </button>
 
       {open && (
-        <div className="mt-2 ml-1 border-l-2 border-[#E0E7FF] pl-3.5 space-y-1">
-          {tools.map((tool, i) => (
-            <ToolBadge key={i} tool={tool} autoCollapsed={false}>
-              {renderChildren?.(tool)}
-            </ToolBadge>
-          ))}
-        </div>
+        isSubagentGroup ? (
+          <div className="mt-2 ml-1 flex gap-2.5 overflow-x-auto pb-1.5">
+            {tools.map((tool, i) => (
+              <SubagentCard key={i} tool={tool}>
+                {renderChildren?.(tool)}
+              </SubagentCard>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-2 ml-1 border-l-2 border-[#E0E7FF] pl-3.5 space-y-1">
+            {tools.map((tool, i) => (
+              <ToolBadge key={i} tool={tool} autoCollapsed={false}>
+                {renderChildren?.(tool)}
+              </ToolBadge>
+            ))}
+          </div>
+        )
       )}
     </div>
   )
