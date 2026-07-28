@@ -1,6 +1,6 @@
 export type Role = "user" | "assistant" | "system"
 
-export type ThinkingEffort = "low" | "medium" | "high" | "xhigh"
+export type ThinkingEffort = "none" | "low" | "medium" | "high" | "xhigh"
 
 export type Model = {
   id: string
@@ -11,6 +11,16 @@ export type Model = {
   context: string
   size: string
   default?: boolean
+  // Which thinking_effort levels are actually meaningful/safe for this
+  // model — verified live per-model (see AVAILABLE_MODELS in
+  // backend/app/schemas/chat.py for the evidence). Not every model exposes
+  // all 4 levels: some collapse several levels to a no-op, others make
+  // "xhigh" specifically unsafe (unbounded reasoning with no official
+  // provider support).
+  effortOptions: ThinkingEffort[]
+  // Real HuggingFace repo path if this model is open-weight (sourced from
+  // OpenRouter's own hugging_face_id field), null if closed/proprietary.
+  huggingFaceId: string | null
 }
 
 export type ToolStatus = "streaming" | "running" | "done"

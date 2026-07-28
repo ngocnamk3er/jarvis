@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react"
-import { SendHorizontal, Loader2, Brain, ChevronDown, Check, Cpu, Bot, Paperclip, X, File } from "lucide-react"
+import { SendHorizontal, Loader2, Brain, ChevronDown, Check, Cpu, Bot, Paperclip, X, File, Unlock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThinkingEffort, Model } from "@/types/chat"
 import { useModels } from "@/hooks/use-models"
@@ -9,11 +9,28 @@ import { useModels } from "@/hooks/use-models"
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 const EFFORT_OPTIONS: { value: ThinkingEffort; label: string; desc: string }[] = [
+  { value: "none", label: "None", desc: "No thinking — fastest, direct answer" },
   { value: "low", label: "Low", desc: "Faster, lighter thinking" },
   { value: "medium", label: "Medium", desc: "Balanced reasoning" },
   { value: "high", label: "High", desc: "Deep reasoning" },
   { value: "xhigh", label: "Max", desc: "Most thorough, slowest" },
 ]
+
+// Shown next to open-weight models in the picker (Model.huggingFaceId
+// non-null) — see AVAILABLE_MODELS in backend/app/schemas/chat.py, sourced
+// from OpenRouter's own hugging_face_id field.
+function OpenWeightBadge({ huggingFaceId }: { huggingFaceId: string | null }) {
+  if (!huggingFaceId) return null
+  return (
+    <span
+      title={`Open-weight — ${huggingFaceId} on Hugging Face`}
+      className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-emerald-700 bg-emerald-50 rounded-full px-1.5 py-0.5"
+    >
+      <Unlock className="size-2.5" />
+      Open
+    </span>
+  )
+}
 
 type AttachedFile = { name: string; virtualPath: string }
 
@@ -154,7 +171,20 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation, in
     }
   }, [models, initialSubagentModelId])
 
-  const currentEffort = EFFORT_OPTIONS.find((o) => o.value === effort)!
+  // Only the levels this model actually supports meaningfully/safely (see
+  // AVAILABLE_MODELS in backend/app/schemas/chat.py for per-model evidence).
+  const availableEffortOptions = EFFORT_OPTIONS.filter((o) => model?.effortOptions.includes(o.value))
+
+  // If switching models drops the currently-selected level (e.g. "xhigh" on
+  // a model where it's unsafe, or "low" on a model where it's a no-op),
+  // snap to "high" if still available, else the first remaining option.
+  useEffect(() => {
+    if (!model) return
+    if (model.effortOptions.includes(effort)) return
+    setEffort(model.effortOptions.includes("high") ? "high" : model.effortOptions[0])
+  }, [model, effort])
+
+  const currentEffort = EFFORT_OPTIONS.find((o) => o.value === effort) ?? availableEffortOptions[0]
   const canSend = !disabled && !!model && (value.trim().length > 0 || attachedFiles.length > 0)
 
   return (
@@ -220,23 +250,36 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation, in
                 {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Paperclip className="size-3.5" />}
               </button>
 
-              {/* Thinking effort selector */}
+              {/* Thinking effort selector — options filtered per-model to
+                  only levels verified meaningful/safe for it (see
+                  Model.effortOptions / AVAILABLE_MODELS for the evidence).
+                  When a model only has one real option, there's nothing to
+                  choose between (e.g. Qwen's chat template only has a
+                  binary thinking on/off, no graduated levels) — disable
+                  the control instead of showing a pointless 1-item dropdown. */}
               <div ref={effortRef} className="relative">
                 <button
-                  onClick={() => { setEffortOpen((o) => !o); setModelOpen(false) }}
-                  className="flex items-center gap-1.5 bg-[#EEF0FF] hover:bg-[#E4E7FF] transition-colors rounded-full px-2.5 py-1"
+                  onClick={() => { if (availableEffortOptions.length > 1) { setEffortOpen((o) => !o); setModelOpen(false) } }}
+                  disabled={availableEffortOptions.length <= 1}
+                  title={availableEffortOptions.length > 1 ? undefined : `${model?.name ?? "This model"} only has one real thinking level — no graduated effort control exists to switch between`}
+                  className={cn(
+                    "flex items-center gap-1.5 transition-colors rounded-full px-2.5 py-1",
+                    availableEffortOptions.length > 1
+                      ? "bg-[#EEF0FF] hover:bg-[#E4E7FF] cursor-pointer"
+                      : "bg-gray-100 cursor-not-allowed opacity-60"
+                  )}
                 >
-                  <Brain className="size-3 text-[#5661f6] shrink-0" />
-                  <span className="text-[11px] font-semibold text-[#5661f6]">{currentEffort.label}</span>
+                  <Brain className={cn("size-3 shrink-0", availableEffortOptions.length > 1 ? "text-[#5661f6]" : "text-gray-400")} />
+                  <span className={cn("text-[11px] font-semibold", availableEffortOptions.length > 1 ? "text-[#5661f6]" : "text-gray-400")}>{currentEffort?.label}</span>
                   <ChevronDown
-                    className="size-2.5 text-[#5661f6] transition-transform duration-150"
+                    className={cn("size-2.5 transition-transform duration-150", availableEffortOptions.length > 1 ? "text-[#5661f6]" : "text-gray-400")}
                     style={{ transform: effortOpen ? "rotate(180deg)" : "rotate(0deg)" }}
                   />
                 </button>
 
                 {effortOpen && (
                   <div className="absolute bottom-full left-0 mb-2 w-44 bg-white rounded-2xl shadow-lg border border-gray-100 py-1 z-10">
-                    {EFFORT_OPTIONS.map((opt) => (
+                    {availableEffortOptions.map((opt) => (
                       <button
                         key={opt.value}
                         onClick={() => { setEffort(opt.value); setEffortOpen(false) }}
@@ -289,12 +332,15 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation, in
                         )}
                       >
                         <div className="flex-1 min-w-0">
-                          <p className={cn(
-                            "text-[12px] font-semibold leading-[16px]",
-                            m.id === model?.id ? "text-[#5661f6]" : "text-gray-700"
-                          )}>
-                            {m.name}
-                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <p className={cn(
+                              "text-[12px] font-semibold leading-[16px]",
+                              m.id === model?.id ? "text-[#5661f6]" : "text-gray-700"
+                            )}>
+                              {m.name}
+                            </p>
+                            <OpenWeightBadge huggingFaceId={m.huggingFaceId} />
+                          </div>
                           <p className="text-[10px] text-gray-400 leading-[14px] mt-0.5">{m.desc}</p>
                           <p className="text-[10px] text-gray-400 leading-[14px] mt-0.5">{m.size}</p>
                           <div className="flex items-center gap-2 mt-1">
@@ -363,12 +409,15 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation, in
                         )}
                       >
                         <div className="flex-1 min-w-0">
-                          <p className={cn(
-                            "text-[12px] font-semibold leading-[16px]",
-                            m.id === subagentModel?.id ? "text-[#5661f6]" : "text-gray-700"
-                          )}>
-                            {m.name}
-                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <p className={cn(
+                              "text-[12px] font-semibold leading-[16px]",
+                              m.id === subagentModel?.id ? "text-[#5661f6]" : "text-gray-700"
+                            )}>
+                              {m.name}
+                            </p>
+                            <OpenWeightBadge huggingFaceId={m.huggingFaceId} />
+                          </div>
                           <p className="text-[10px] text-gray-400 leading-[14px] mt-0.5">{m.desc}</p>
                           <p className="text-[10px] text-gray-400 leading-[14px] mt-0.5">{m.size}</p>
                           <div className="flex items-center gap-2 mt-1">
