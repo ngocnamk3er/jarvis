@@ -12,6 +12,7 @@ import { MessageList } from "./message-list"
 import { ChatInput } from "./chat-input"
 import { PreviewPanel, GeneratedFile } from "./file-tray"
 import { HitlApproval } from "./hitl-approval"
+import { ClarifyRequest } from "./clarify-request"
 
 // Module-level set to track which threads have already had history loaded
 // (avoids re-fetching when switching back to a conversation mid-stream)
@@ -40,7 +41,7 @@ export function ChatWindow() {
   const lastSentModel = useRef<Map<string, string>>(new Map())
   const lastSentSubagentModel = useRef<Map<string, string>>(new Map())
 
-  const { messages, isLoading, pendingHitl, interrupted, sendMessage, resumeMessage, clearThread, loadHistory } = useChat(activeId)
+  const { messages, isLoading, pendingHitl, pendingClarify, interrupted, sendMessage, resumeMessage, resumeClarify, clearThread, loadHistory } = useChat(activeId)
   const loadingThreadIds = useLoadingThreadIds()
   const [previewFile, setPreviewFile] = useState<GeneratedFile | null>(null)
 
@@ -172,7 +173,14 @@ export function ChatWindow() {
             />
           )}
 
-          {interrupted && !isLoading && !pendingHitl && (
+          {pendingClarify && !isLoading && (
+            <ClarifyRequest
+              clarify={pendingClarify}
+              onAnswer={(answer) => resumeClarify(answer, resumeModel, resumeSubagentModel)}
+            />
+          )}
+
+          {interrupted && !isLoading && !pendingHitl && !pendingClarify && (
             <div className="flex justify-center pb-2">
               <div className="flex items-center gap-2.5 bg-white border border-amber-200 text-amber-700 rounded-full px-4 py-2 text-[12px] shadow-sm">
                 <span>Response was interrupted</span>
@@ -190,7 +198,7 @@ export function ChatWindow() {
           <ChatInput
             key={activeId}
             onSend={handleSend}
-            disabled={isLoading || !!pendingHitl}
+            disabled={isLoading || !!pendingHitl || !!pendingClarify}
             threadId={activeId}
             initialModelId={
               (activeId && lastSentModel.current.get(activeId)) ??

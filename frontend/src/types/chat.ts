@@ -90,6 +90,11 @@ export type PendingHitl = {
   review_configs: HitlReviewConfig[]
 }
 
+export type PendingClarify = {
+  question: string
+  options?: string[] | null
+}
+
 export type StreamEvent =
   | { type: "token"; content: string }
   | { type: "thinking_token"; content: string }
@@ -99,6 +104,7 @@ export type StreamEvent =
   | { type: "viz"; format: "svg"; code: string; title?: string; task_run_id?: string }
   | { type: "todo_update"; todos: Todo[]; task_run_id?: string }
   | { type: "hitl_request"; actions: HitlAction[]; review_configs: HitlReviewConfig[] }
+  | { type: "clarify_request"; question: string; options?: string[] | null }
   | ({ type: "usage" } & TokenUsage)
   | { type: "done" }
   | { type: "error"; message: string }

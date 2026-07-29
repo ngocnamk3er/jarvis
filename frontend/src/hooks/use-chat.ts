@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
-import { Message, MessagePart, StreamEvent, ThinkingEffort, ToolCall, Model, PendingHitl } from "@/types/chat"
+import { Message, MessagePart, StreamEvent, ThinkingEffort, ToolCall, Model, PendingHitl, PendingClarify } from "@/types/chat"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
@@ -9,6 +9,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 const _msgs = new Map<string, Message[]>()
 const _loading = new Map<string, boolean>()
 const _hitl = new Map<string, PendingHitl | null>()
+const _clarify = new Map<string, PendingClarify | null>()
 const _interrupted = new Map<string, boolean>()
 
 // Per-thread re-render subscribers
@@ -206,6 +207,11 @@ async function runStream(body: ReadableStream<Uint8Array>, threadId: string, tar
           _notify(threadId)
           break
 
+        case "clarify_request":
+          _clarify.set(threadId, { question: event.question, options: event.options })
+          _notify(threadId)
+          break
+
         case "done":
           updateMsg((m) => ({ ...m, isStreaming: false, parts: m.parts.map(p => p.type === "thinking" ? { ...p, isStreaming: false } : p) }))
           break
@@ -235,6 +241,7 @@ export function useChat(threadId: string | null) {
   const messages = threadId ? (_msgs.get(threadId) ?? []) : []
   const isLoading = threadId ? (_loading.get(threadId) ?? false) : false
   const pendingHitl = threadId ? (_hitl.get(threadId) ?? null) : null
+  const pendingClarify = threadId ? (_clarify.get(threadId) ?? null) : null
   const interrupted = threadId ? (_interrupted.get(threadId) ?? false) : false
 
   const loadHistory = useCallback(async (id: string): Promise<boolean> => {
@@ -257,6 +264,7 @@ export function useChat(threadId: string | null) {
     if (!threadId) return
     _msgs.set(threadId, [])
     _hitl.set(threadId, null)
+    _clarify.set(threadId, null)
     _interrupted.set(threadId, false)
     _notify(threadId)
   }, [threadId])
@@ -279,6 +287,7 @@ export function useChat(threadId: string | null) {
     async (content: string, thinking_effort: ThinkingEffort = "high", model?: Model, subagentModel?: Model) => {
       if (!threadId) return
       _hitl.set(threadId, null)
+      _clarify.set(threadId, null)
       _interrupted.set(threadId, false)
 
       const userMsg: Message = { id: makeId(), role: "user", parts: [{ type: "text", content }], isStreaming: false }
@@ -322,6 +331,7 @@ export function useChat(threadId: string | null) {
       if (!resumeId) return
 
       _hitl.set(threadId, null)
+      _clarify.set(threadId, null)
       _msgs.set(threadId, msgs.map(m => {
         if (m.id !== resumeId) return m
         // Resuming re-executes the interrupted tool call from scratch with a
@@ -362,7 +372,57 @@ export function useChat(threadId: string | null) {
     [threadId, _doStream]
   )
 
-  return { messages, isLoading, pendingHitl, interrupted, sendMessage, resumeMessage, clearThread, loadHistory }
+  const resumeClarify = useCallback(
+    async (answer: string, model?: Model, subagentModel?: Model) => {
+      if (!threadId) return
+      const msgs = _msgs.get(threadId) ?? []
+      let resumeId = ""
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === "assistant") { resumeId = msgs[i].id; break }
+      }
+      if (!resumeId) return
+
+      _clarify.set(threadId, null)
+      _hitl.set(threadId, null)
+      _msgs.set(threadId, msgs.map(m => {
+        if (m.id !== resumeId) return m
+        // Same reasoning as resumeMessage: resuming replays the interrupted
+        // ask_user call from scratch with a fresh run_id, so its tool_start
+        // (already suppressed as a badge, but tracked internally) will never
+        // get a matching tool_end from this new stream.
+        const parts = m.parts.map(p =>
+          p.type === "tool" && p.tool.status !== "done"
+            ? { ...p, tool: { ...p.tool, status: "done" as const } }
+            : p
+        )
+        return { ...m, parts, isStreaming: true }
+      }))
+      _notify(threadId)
+
+      const res = await fetch(`${API_URL}/api/v1/chat/resume_clarify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thread_id: threadId,
+          answer,
+          model: model?.id,
+          subagent_model: subagentModel?.id,
+        }),
+      }).catch(() => null)
+
+      if (!res?.body) {
+        _msgs.set(threadId, (_msgs.get(threadId) ?? []).map(m =>
+          m.id === resumeId ? { ...m, parts: [...m.parts, { type: "text" as const, content: "Failed to resume." }], isStreaming: false } : m
+        ))
+        _notify(threadId)
+        return
+      }
+      await _doStream(res.body, threadId, resumeId)
+    },
+    [threadId, _doStream]
+  )
+
+  return { messages, isLoading, pendingHitl, pendingClarify, interrupted, sendMessage, resumeMessage, resumeClarify, clearThread, loadHistory }
 }
 
 // ── Sidebar loading hook ───────────────────────────────────────────────────────
