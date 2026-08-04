@@ -48,6 +48,8 @@ export type Todo = {
   status: TodoStatus
 }
 
+export type ToolLimitLevel = "soft" | "hard"
+
 export type MessagePart =
   | { type: "text"; content: string }
   | { type: "tool"; tool: ToolCall }
@@ -56,6 +58,17 @@ export type MessagePart =
   // under that subagent's badge) rather than the main agent's own turn.
   | { type: "viz"; format: "svg"; code: string; title?: string; task_run_id?: string }
   | { type: "todos"; todos: Todo[]; task_run_id?: string }
+  // Emitted when SoftHardToolCallLimitMiddleware blocks a call — "soft" means
+  // blocked but the run continues, "hard" means blocked and the run stopped.
+  | {
+      type: "tool_limit"
+      tool_name: string
+      level: ToolLimitLevel
+      count: number
+      limit: number
+      blocked: number
+      task_run_id?: string
+    }
 
 export type TokenUsage = {
   input_tokens: number
@@ -103,6 +116,15 @@ export type StreamEvent =
   | { type: "tool_end"; name: string; output: string; run_id?: string; task_run_id?: string }
   | { type: "viz"; format: "svg"; code: string; title?: string; task_run_id?: string }
   | { type: "todo_update"; todos: Todo[]; task_run_id?: string }
+  | {
+      type: "tool_limit"
+      tool_name: string
+      level: ToolLimitLevel
+      count: number
+      limit: number
+      blocked: number
+      task_run_id?: string
+    }
   | { type: "hitl_request"; actions: HitlAction[]; review_configs: HitlReviewConfig[] }
   | { type: "clarify_request"; question: string; options?: string[] | null }
   | ({ type: "usage" } & TokenUsage)

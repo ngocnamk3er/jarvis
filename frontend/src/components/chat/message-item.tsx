@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
-import { Copy, Check, Brain, ChevronDown, BarChart2 } from "lucide-react"
+import { Copy, Check, Brain, ChevronDown, BarChart2, AlertTriangle, OctagonX } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
@@ -66,7 +66,7 @@ function splitNestedTools(parts: MessagePart[]): { topLevel: MessagePart[]; byTa
   const byTaskRunId = new Map<string, MessagePart[]>()
   for (const part of parts) {
     const taskRunId = part.type === "tool" ? part.tool.task_run_id
-      : part.type === "todos" || part.type === "viz" ? part.task_run_id
+      : part.type === "todos" || part.type === "viz" || part.type === "tool_limit" ? part.task_run_id
       : undefined
     if (taskRunId) {
       const arr = byTaskRunId.get(taskRunId) ?? []
@@ -127,8 +127,34 @@ function renderToolItems(parts: MessagePart[], byTaskRunId: Map<string, MessageP
         </div>
       )
     }
+    if (item.kind === "other" && item.part.type === "tool_limit") {
+      return <ToolLimitNotice key={ri} part={item.part} />
+    }
     return null
   })
+}
+
+// Shown when SoftHardToolCallLimitMiddleware blocks a call — "soft" means the
+// run kept going, "hard" means it stopped right there.
+function ToolLimitNotice({ part }: { part: MessagePart & { type: "tool_limit" } }) {
+  const isHard = part.level === "hard"
+  return (
+    <div
+      className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium ${
+        isHard
+          ? "border-red-200 bg-red-50 text-red-600"
+          : "border-amber-200 bg-amber-50 text-amber-700"
+      }`}
+    >
+      {isHard ? <OctagonX className="size-3.5 shrink-0" /> : <AlertTriangle className="size-3.5 shrink-0" />}
+      <span>
+        {isHard ? "Hard limit" : "Soft limit"} reached for{" "}
+        <span className="font-mono">{part.tool_name}</span> ({part.count}/{part.limit} calls/run) —{" "}
+        {part.blocked} call{part.blocked === 1 ? "" : "s"} blocked
+        {isHard ? ", run stopped" : ""}
+      </span>
+    </div>
+  )
 }
 
 function ThinkingBlock({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
@@ -324,6 +350,10 @@ export function MessageItem({
 
           if (part.type === "todos") {
             return <TodoList key={ri} todos={part.todos} />
+          }
+
+          if (part.type === "tool_limit") {
+            return <ToolLimitNotice key={ri} part={part} />
           }
 
           if (part.type === "viz") {

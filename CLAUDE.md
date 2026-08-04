@@ -52,9 +52,9 @@ returns a `StreamingResponse` wrapping `chat_service.stream(...)`
 agent (`app.state.graph`, built once at startup in `main.py`) via
 `graph.astream_events(...)` and translates LangGraph's event stream into a
 custom SSE protocol: `token`, `thinking_token`, `tool_start`, `tool_end`,
-`tool_chunk`, `viz`, `todo_update`, `usage`, `hitl_request`, `done`, `error`. The frontend's
-`use-chat.ts` hook is the sole consumer of this protocol — any new event type
-must be added on both sides.
+`tool_chunk`, `viz`, `todo_update`, `tool_limit`, `usage`, `hitl_request`, `done`, `error`.
+The frontend's `use-chat.ts` hook is the sole consumer of this protocol — any
+new event type must be added on both sides.
 
 Streaming is driven inline inside the request coroutine — there is no
 queue/background-task decoupling. Cancellation depends entirely on the ASGI

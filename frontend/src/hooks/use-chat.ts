@@ -188,6 +188,24 @@ async function runStream(body: ReadableStream<Uint8Array>, threadId: string, tar
           })
           break
 
+        case "tool_limit":
+          updateMsg((m) => ({
+            ...m,
+            parts: [
+              ...m.parts,
+              {
+                type: "tool_limit" as const,
+                tool_name: event.tool_name,
+                level: event.level,
+                count: event.count,
+                limit: event.limit,
+                blocked: event.blocked,
+                task_run_id: event.task_run_id,
+              },
+            ],
+          }))
+          break
+
         case "usage":
           updateMsg((m) => ({
             ...m,
