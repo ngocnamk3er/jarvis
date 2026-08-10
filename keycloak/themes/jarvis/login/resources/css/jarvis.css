@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+    /* Matches frontend/src/app/globals.css's brand color and its hover
+       shade used throughout the sidebar/chat-input buttons. */
+    --jarvis-primary: #5661f6;
+    --jarvis-primary-hover: #4550e0;
+
+    --pf-v5-global--primary-color--100: var(--jarvis-primary);
+    --pf-v5-global--primary-color--200: var(--jarvis-primary-hover);
+    --pf-v5-global--active-color--100: var(--jarvis-primary);
+    --pf-v5-global--active-color--200: var(--jarvis-primary);
+    --pf-v5-global--link--Color: var(--jarvis-primary);
+    --pf-v5-global--link--Color--hover: var(--jarvis-primary-hover);
+
+    --pf-v5-global--FontFamily--text: 'Plus Jakarta Sans', helvetica, arial, sans-serif;
+    --pf-v5-global--FontFamily--text--vf: 'Plus Jakarta Sans', helvetica, arial, sans-serif;
+    --pf-v5-global--FontFamily--heading: 'Plus Jakarta Sans', helvetica, arial, sans-serif;
+    --pf-v5-global--FontFamily--heading--vf: 'Plus Jakarta Sans', helvetica, arial, sans-serif;
+
+    /* Buttons/inputs default to a near-square 3px radius — round them off
+       to match the frontend's rounded-xl/rounded-full buttons. */
+    --pf-v5-global--BorderRadius--sm: 10px;
+}
+
+/* ── Split-screen layout ──────────────────────────────────────────────────
+   Verified live against keycloak.v2/login/template.ftl: <body> directly
+   wraps a single <div class="pf-v5-c-login"> — no separate FTL edit needed,
+   body::before becomes the first flex child (the branding panel) and the
+   real .pf-v5-c-login content becomes the second (the form side). */
+
+.login-pf body {
+    display: flex;
+    min-height: 100vh;
+    background: #f7f7fb;
+}
+
+.login-pf body::before {
+    content: "";
+    flex: 0 0 42%;
+    min-height: 100vh;
+    background-image: url('../img/jarvis-panel.svg');
+    background-size: cover;
+    background-position: center;
+}
+
+.pf-v5-c-login {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem 1rem;
+}
+
+/* The branding panel already carries the "Jarvis" wordmark — the header
+   text above the form card would just be a redundant second logo. */
+#kc-header {
+    display: none;
+}
+
+.pf-v5-c-login__main-header {
+    border-top: none;
+}
+
+/* Below ~900px there isn't room for a 42%-width panel next to a usable
+   form — collapse to the plain single-column form, same as before this
+   change. */
+@media (max-width: 900px) {
+    .login-pf body::before {
+        display: none;
+    }
+}
+
+.pf-v5-c-button.pf-m-primary {
+    background-color: var(--jarvis-primary);
+}
+
+.pf-v5-c-button.pf-m-primary:hover,
+.pf-v5-c-button.pf-m-primary:focus {
+    background-color: var(--jarvis-primary-hover);
+}
+
+.pf-v5-c-form-control:focus {
+    border-bottom-color: var(--jarvis-primary);
+}
+
+.pf-v5-c-check__input:checked {
+    background-color: var(--jarvis-primary);
+    border-color: var(--jarvis-primary);
+}

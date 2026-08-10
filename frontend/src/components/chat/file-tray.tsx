@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import { X, Download, FileText, Image, File, Sheet, Loader2, Code2, FileCode } from "lucide-react"
+import { apiFetch } from "@/lib/api-client"
 import { Message } from "@/types/chat"
 
 interface GeneratedFile {
@@ -59,7 +61,7 @@ function PdfPreview({ url, name }: { url: string; name: string }) {
   )
 }
 
-function DocxPreview({ url }: { url: string }) {
+function DocxPreview({ url, token }: { url: string; token?: string | null }) {
   const [html, setHtml] = useState<string | null>(null)
   const [error, setError] = useState(false)
 
@@ -67,7 +69,7 @@ function DocxPreview({ url }: { url: string }) {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(url)
+        const res = await apiFetch(url, token)
         const buf = await res.arrayBuffer()
         const mammoth = await import("mammoth")
         const result = await mammoth.convertToHtml({ arrayBuffer: buf })
@@ -77,7 +79,7 @@ function DocxPreview({ url }: { url: string }) {
       }
     })()
     return () => { cancelled = true }
-  }, [url])
+  }, [url, token])
 
   if (error) return <p className="text-[13px] text-red-400">Failed to render document.</p>
   if (html === null) return <Loader2 className="size-5 animate-spin text-[#5661f6]" />
@@ -95,7 +97,7 @@ function DocxPreview({ url }: { url: string }) {
   )
 }
 
-function XlsxPreview({ url }: { url: string }) {
+function XlsxPreview({ url, token }: { url: string; token?: string | null }) {
   const [html, setHtml] = useState<string | null>(null)
   const [sheets, setSheets] = useState<string[]>([])
   const [active, setActive] = useState(0)
@@ -105,7 +107,7 @@ function XlsxPreview({ url }: { url: string }) {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(url)
+        const res = await apiFetch(url, token)
         const buf = await res.arrayBuffer()
         const XLSX = await import("xlsx")
         const wb = XLSX.read(buf, { type: "array" })
@@ -120,7 +122,7 @@ function XlsxPreview({ url }: { url: string }) {
       }
     })()
     return () => { cancelled = true }
-  }, [url])
+  }, [url, token])
 
   const switchSheet = async (i: number) => {
     const XLSX = await import("xlsx")
@@ -164,12 +166,12 @@ function XlsxPreview({ url }: { url: string }) {
   )
 }
 
-function SvgPreview({ url, name }: { url: string; name: string }) {
+function SvgPreview({ url, name, token }: { url: string; name: string; token?: string | null }) {
   const [svg, setSvg] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(url).then(r => r.text()).then(setSvg).catch(() => setSvg(""))
-  }, [url])
+    apiFetch(url, token).then(r => r.text()).then(setSvg).catch(() => setSvg(""))
+  }, [url, token])
 
   if (svg === null) return <Loader2 className="size-5 animate-spin text-[#5661f6]" />
   if (!svg) return <img src={url} alt={name} className="max-w-full h-auto" />
@@ -181,19 +183,19 @@ function SvgPreview({ url, name }: { url: string; name: string }) {
   )
 }
 
-function CodePreview({ url, ext }: { url: string; ext: string }) {
+function CodePreview({ url, ext, token }: { url: string; ext: string; token?: string | null }) {
   const [code, setCode] = useState<string | null>(null)
   const [error, setError] = useState(false)
   const lang = EXT_TO_LANG[ext] ?? "text"
 
   useEffect(() => {
     let cancelled = false
-    fetch(url)
+    apiFetch(url, token)
       .then(r => r.text())
       .then(t => { if (!cancelled) setCode(t) })
       .catch(() => { if (!cancelled) setError(true) })
     return () => { cancelled = true }
-  }, [url])
+  }, [url, token])
 
   if (error) return <p className="text-[13px] text-red-400">Failed to load file.</p>
   if (code === null) return <Loader2 className="size-5 animate-spin text-[#5661f6]" />
@@ -245,18 +247,18 @@ function SyntaxHighlighterBlock({ code, lang }: { code: string; lang: string }) 
   )
 }
 
-function TextPreview({ url }: { url: string }) {
+function TextPreview({ url, token }: { url: string; token?: string | null }) {
   const [text, setText] = useState<string | null>(null)
   const [error, setError] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    fetch(url)
+    apiFetch(url, token)
       .then(r => r.text())
       .then(t => { if (!cancelled) setText(t) })
       .catch(() => { if (!cancelled) setError(true) })
     return () => { cancelled = true }
-  }, [url])
+  }, [url, token])
 
   if (error) return <p className="text-[13px] text-red-400">Failed to load file.</p>
   if (text === null) return <Loader2 className="size-5 animate-spin text-[#5661f6]" />
@@ -268,18 +270,18 @@ function TextPreview({ url }: { url: string }) {
   )
 }
 
-function MarkdownPreview({ url }: { url: string }) {
+function MarkdownPreview({ url, token }: { url: string; token?: string | null }) {
   const [md, setMd] = useState<string | null>(null)
   const [error, setError] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    fetch(url)
+    apiFetch(url, token)
       .then(r => r.text())
       .then(t => { if (!cancelled) setMd(t) })
       .catch(() => { if (!cancelled) setError(true) })
     return () => { cancelled = true }
-  }, [url])
+  }, [url, token])
 
   if (error) return <p className="text-[13px] text-red-400">Failed to load file.</p>
   if (md === null) return <Loader2 className="size-5 animate-spin text-[#5661f6]" />
@@ -336,6 +338,8 @@ function MarkdownRenderer({ content }: { content: string }) {
 // ── main panel ───────────────────────────────────────────────────────────────
 
 function PreviewPanel({ file, onClose }: { file: GeneratedFile; onClose: () => void }) {
+  const { data: session } = useSession()
+  const token = session?.accessToken
   const { name, url, ext } = file
   const isImage = ["png", "jpg", "jpeg", "gif", "webp"].includes(ext)
   const isSvg = ext === "svg"
@@ -373,13 +377,13 @@ function PreviewPanel({ file, onClose }: { file: GeneratedFile; onClose: () => v
       {/* Preview body */}
       <div className="flex-1 overflow-auto bg-gray-50 p-4 flex flex-col items-start">
         {isImage    && <ImagePreview    url={url} name={name} />}
-        {isSvg      && <SvgPreview      url={url} name={name} />}
+        {isSvg      && <SvgPreview      url={url} name={name} token={token} />}
         {isPdf      && <PdfPreview      url={url} name={name} />}
-        {isDocx     && <DocxPreview     url={url} />}
-        {isSheet    && <XlsxPreview     url={url} />}
-        {isCode     && <CodePreview     url={url} ext={ext} />}
-        {isText     && <TextPreview     url={url} />}
-        {isMarkdown && <MarkdownPreview url={url} />}
+        {isDocx     && <DocxPreview     url={url} token={token} />}
+        {isSheet    && <XlsxPreview     url={url} token={token} />}
+        {isCode     && <CodePreview     url={url} ext={ext} token={token} />}
+        {isText     && <TextPreview     url={url} token={token} />}
+        {isMarkdown && <MarkdownPreview url={url} token={token} />}
         {!hasPreview && (
           <div className="flex flex-col items-center justify-center w-full h-full gap-3 text-gray-400">
             <File className="size-10" />

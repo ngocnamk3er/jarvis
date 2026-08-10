@@ -1,18 +1,21 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useSession } from "next-auth/react"
+import { apiFetch } from "@/lib/api-client"
 import { Conversation } from "@/types/chat"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
-
 export function useConversations() {
+  const { data: session, status } = useSession()
+  const accessToken = session?.accessToken
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(false)
 
   const fetch_ = useCallback(async () => {
+    if (!accessToken) return
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/api/v1/conversations`)
+      const res = await apiFetch("/api/v1/conversations", accessToken)
       if (!res.ok) return
       const data: Conversation[] = await res.json()
       setConversations(Array.isArray(data) ? data : [])
@@ -21,10 +24,10 @@ export function useConversations() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [accessToken])
 
   const create = useCallback(async (title = "New conversation"): Promise<Conversation> => {
-    const res = await fetch(`${API_URL}/api/v1/conversations`, {
+    const res = await apiFetch("/api/v1/conversations", accessToken, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title }),
@@ -37,15 +40,15 @@ export function useConversations() {
       return [conv, ...safe.filter((c) => c.id !== conv.id)]
     })
     return conv
-  }, [])
+  }, [accessToken])
 
   const remove = useCallback(async (id: string) => {
-    await fetch(`${API_URL}/api/v1/conversations/${id}`, { method: "DELETE" })
+    await apiFetch(`/api/v1/conversations/${id}`, accessToken, { method: "DELETE" })
     setConversations((prev) => prev.filter((c) => c.id !== id))
-  }, [])
+  }, [accessToken])
 
   const updateTitle = useCallback(async (id: string, title: string) => {
-    await fetch(`${API_URL}/api/v1/conversations/${id}/title`, {
+    await apiFetch(`/api/v1/conversations/${id}/title`, accessToken, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title }),
@@ -53,7 +56,7 @@ export function useConversations() {
     setConversations((prev) =>
       prev.map((c) => (c.id === id ? { ...c, title } : c))
     )
-  }, [])
+  }, [accessToken])
 
   // The backend already persists last_model as a side effect of /chat/stream
   // (see chat.py's touch_conversation call) — this just mirrors that locally
@@ -70,7 +73,9 @@ export function useConversations() {
     )
   }, [])
 
-  useEffect(() => { fetch_() }, [fetch_])
+  useEffect(() => {
+    if (status === "authenticated") fetch_()
+  }, [status, fetch_])
 
   return { conversations, loading, refetch: fetch_, create, remove, updateTitle, setLastModel, setLastSubagentModel }
 }

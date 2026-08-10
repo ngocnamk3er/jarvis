@@ -1,9 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { apiFetch } from "@/lib/api-client"
 import { Model } from "@/types/chat"
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 export function useModels() {
   const [models, setModels] = useState<Model[]>([])
@@ -13,7 +12,8 @@ export function useModels() {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(`${API_URL}/api/v1/chat/models`)
+        // /chat/models is static config, deliberately left unauthenticated
+        const res = await apiFetch("/api/v1/chat/models", null)
         if (!res.ok) return
         const data: Model[] = await res.json()
         if (!cancelled) setModels(Array.isArray(data) ? data : [])

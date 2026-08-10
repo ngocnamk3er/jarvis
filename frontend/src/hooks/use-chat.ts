@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
+import { useSession } from "next-auth/react"
+import { apiFetch } from "@/lib/api-client"
 import { Message, MessagePart, StreamEvent, ThinkingEffort, ToolCall, Model, PendingHitl, PendingClarify } from "@/types/chat"
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 // ── Module-level per-thread storage (persists across conversation switches) ──
 const _msgs = new Map<string, Message[]>()
@@ -246,6 +246,8 @@ async function runStream(body: ReadableStream<Uint8Array>, threadId: string, tar
 // ── Hook ──────────────────────────────────────────────────────────────────────
 export function useChat(threadId: string | null) {
   const [, rerender] = useState(0)
+  const { data: session } = useSession()
+  const accessToken = session?.accessToken
 
   // Subscribe to updates for this thread
   useEffect(() => {
@@ -263,7 +265,7 @@ export function useChat(threadId: string | null) {
   const interrupted = threadId ? (_interrupted.get(threadId) ?? false) : false
 
   const loadHistory = useCallback(async (id: string): Promise<boolean> => {
-    const res = await fetch(`${API_URL}/api/v1/conversations/${id}/messages`)
+    const res = await apiFetch(`/api/v1/conversations/${id}/messages`, accessToken)
     const data: { messages: { role: string; parts: MessagePart[]; usage?: Message["usage"] }[]; is_pending: boolean } = await res.json()
     const loaded: Message[] = data.messages.map((m) => ({
       id: makeId(),
@@ -276,7 +278,7 @@ export function useChat(threadId: string | null) {
     _interrupted.set(id, data.is_pending ?? false)
     _notify(id)
     return data.is_pending ?? false
-  }, [])
+  }, [accessToken])
 
   const clearThread = useCallback(() => {
     if (!threadId) return
@@ -314,7 +316,7 @@ export function useChat(threadId: string | null) {
       _msgs.set(threadId, [...(_msgs.get(threadId) ?? []), userMsg, assistantMsg])
       _notify(threadId)
 
-      const res = await fetch(`${API_URL}/api/v1/chat/stream`, {
+      const res = await apiFetch("/api/v1/chat/stream", accessToken, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -335,7 +337,7 @@ export function useChat(threadId: string | null) {
       }
       await _doStream(res.body, threadId, assistantId)
     },
-    [threadId, _doStream]
+    [threadId, accessToken, _doStream]
   )
 
   const resumeMessage = useCallback(
@@ -367,7 +369,7 @@ export function useChat(threadId: string | null) {
       }))
       _notify(threadId)
 
-      const res = await fetch(`${API_URL}/api/v1/chat/resume`, {
+      const res = await apiFetch("/api/v1/chat/resume", accessToken, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -387,7 +389,7 @@ export function useChat(threadId: string | null) {
       }
       await _doStream(res.body, threadId, resumeId)
     },
-    [threadId, _doStream]
+    [threadId, accessToken, _doStream]
   )
 
   const resumeClarify = useCallback(
@@ -417,7 +419,7 @@ export function useChat(threadId: string | null) {
       }))
       _notify(threadId)
 
-      const res = await fetch(`${API_URL}/api/v1/chat/resume_clarify`, {
+      const res = await apiFetch("/api/v1/chat/resume_clarify", accessToken, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -437,7 +439,7 @@ export function useChat(threadId: string | null) {
       }
       await _doStream(res.body, threadId, resumeId)
     },
-    [threadId, _doStream]
+    [threadId, accessToken, _doStream]
   )
 
   return { messages, isLoading, pendingHitl, pendingClarify, interrupted, sendMessage, resumeMessage, resumeClarify, clearThread, loadHistory }

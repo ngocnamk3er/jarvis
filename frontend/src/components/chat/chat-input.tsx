@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react"
+import { useSession } from "next-auth/react"
 import { SendHorizontal, Loader2, Brain, ChevronDown, Check, Cpu, Bot, Paperclip, X, File, Unlock } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { apiFetch } from "@/lib/api-client"
 import { ThinkingEffort, Model } from "@/types/chat"
 import { useModels } from "@/hooks/use-models"
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 const EFFORT_OPTIONS: { value: ThinkingEffort; label: string; desc: string }[] = [
   { value: "none", label: "None", desc: "No thinking — fastest, direct answer" },
@@ -51,6 +51,8 @@ type Props = {
 }
 
 export function ChatInput({ onSend, disabled, threadId, onCreateConversation, initialModelId, initialSubagentModelId }: Props) {
+  const { data: session } = useSession()
+  const accessToken = session?.accessToken
   const { models } = useModels()
   const [value, setValue] = useState("")
   const [effort, setEffort] = useState<ThinkingEffort>("high")
@@ -114,7 +116,7 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation, in
       for (const file of files) {
         const form = new FormData()
         form.append("file", file)
-        const res = await fetch(`${API_URL}/api/v1/files/upload/${tid}`, {
+        const res = await apiFetch(`/api/v1/files/upload/${tid}`, accessToken, {
           method: "POST",
           body: form,
         })
@@ -134,7 +136,7 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation, in
     const file = attachedFiles[idx]
     setAttachedFiles((prev) => prev.filter((_, i) => i !== idx))
     if (file && threadId) {
-      fetch(`${API_URL}/api/v1/files/upload/${threadId}/${encodeURIComponent(file.name)}`, {
+      apiFetch(`/api/v1/files/upload/${threadId}/${encodeURIComponent(file.name)}`, accessToken, {
         method: "DELETE",
       }).catch(() => {})
     }

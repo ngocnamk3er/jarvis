@@ -1,8 +1,26 @@
 "use client"
 
-import { MessageSquare, Plus, Search, Settings, Trash2 } from "lucide-react"
+import { KeyRound, LogOut, MessageSquare, Plus, Search, Trash2, UserRound } from "lucide-react"
+import { useSession, signIn } from "next-auth/react"
 import { cn } from "@/lib/utils"
+import { logout } from "@/lib/logout"
 import { Conversation } from "@/types/chat"
+
+// Keycloak's "Application Initiated Action" (AIA) flow: with an active SSO
+// session, kc_action=<name> skips straight to just that one screen (no
+// account-console nav, no separate logout button) and redirects back into
+// our own callback afterward — verified live for both actions below: each
+// returns a bare form (password fields / name+email fields) rather than the
+// full account console. Beats deep-linking to the Account Console, which
+// left users on a separate page with its own logout button, confusingly
+// out of sync with Jarvis's own session.
+function changePassword() {
+  signIn("keycloak", { callbackUrl: window.location.href }, { kc_action: "UPDATE_PASSWORD" })
+}
+
+function editProfile() {
+  signIn("keycloak", { callbackUrl: window.location.href }, { kc_action: "UPDATE_PROFILE" })
+}
 
 type Props = {
   conversations: Conversation[]
@@ -23,6 +41,10 @@ function SpinnerIcon({ className }: { className?: string }) {
 }
 
 export function Sidebar({ conversations, activeId, loadingThreadIds, onNewChat, onSelect, onDelete }: Props) {
+  const { data: session } = useSession()
+  const displayName = session?.user?.name ?? session?.user?.email ?? "Account"
+  const initial = displayName.charAt(0).toUpperCase()
+
   return (
     <aside className="w-[220px] bg-white flex flex-col h-full shrink-0 border-r border-gray-100">
       <div className="px-5 pt-7 pb-4">
@@ -87,13 +109,30 @@ export function Sidebar({ conversations, activeId, loadingThreadIds, onNewChat, 
       </div>
 
       <div className="px-3 pb-5 pt-3 border-t border-gray-100">
-        <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-xl text-[13px] font-medium text-gray-500 hover:bg-gray-50 transition-colors">
-          <Settings className="size-3.5 opacity-70" />
-          Settings
+        <button
+          onClick={editProfile}
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-xl text-[13px] font-medium text-gray-500 hover:bg-gray-50 transition-colors"
+        >
+          <UserRound className="size-3.5 opacity-70" />
+          Edit profile
+        </button>
+        <button
+          onClick={changePassword}
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-xl text-[13px] font-medium text-gray-500 hover:bg-gray-50 transition-colors"
+        >
+          <KeyRound className="size-3.5 opacity-70" />
+          Change password
         </button>
         <div className="flex items-center gap-2.5 px-2 py-1.5 mt-0.5">
-          <div className="size-6 rounded-full bg-orange-400 flex items-center justify-center text-white text-[10px] font-bold shrink-0">N</div>
-          <span className="text-[13px] font-medium text-gray-700 truncate">Nam Nguyen</span>
+          <div className="size-6 rounded-full bg-orange-400 flex items-center justify-center text-white text-[10px] font-bold shrink-0">{initial}</div>
+          <span className="text-[13px] font-medium text-gray-700 truncate flex-1">{displayName}</span>
+          <button
+            onClick={() => logout(session?.idToken)}
+            className="p-1 rounded hover:text-red-500 text-gray-400 shrink-0"
+            title="Log out"
+          >
+            <LogOut className="size-3.5" />
+          </button>
         </div>
       </div>
     </aside>
