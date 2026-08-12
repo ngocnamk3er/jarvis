@@ -392,6 +392,37 @@ export function useChat(threadId: string | null) {
     [threadId, accessToken, _doStream]
   )
 
+  const compactConversation = useCallback(
+    async (model?: Model, subagentModel?: Model) => {
+      if (!threadId) return
+
+      const assistantId = makeId()
+      const assistantMsg: Message = { id: assistantId, role: "assistant", parts: [], isStreaming: true }
+      _msgs.set(threadId, [...(_msgs.get(threadId) ?? []), assistantMsg])
+      _notify(threadId)
+
+      const res = await apiFetch("/api/v1/chat/compact", accessToken, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thread_id: threadId,
+          model: model?.id,
+          subagent_model: subagentModel?.id,
+        }),
+      }).catch(() => null)
+
+      if (!res?.body) {
+        _msgs.set(threadId, (_msgs.get(threadId) ?? []).map(m =>
+          m.id === assistantId ? { ...m, parts: [{ type: "text" as const, content: "Failed to compact conversation." }], isStreaming: false } : m
+        ))
+        _notify(threadId)
+        return
+      }
+      await _doStream(res.body, threadId, assistantId)
+    },
+    [threadId, accessToken, _doStream]
+  )
+
   const resumeClarify = useCallback(
     async (answer: string, model?: Model, subagentModel?: Model) => {
       if (!threadId) return
@@ -442,7 +473,7 @@ export function useChat(threadId: string | null) {
     [threadId, accessToken, _doStream]
   )
 
-  return { messages, isLoading, pendingHitl, pendingClarify, interrupted, sendMessage, resumeMessage, resumeClarify, clearThread, loadHistory }
+  return { messages, isLoading, pendingHitl, pendingClarify, interrupted, sendMessage, resumeMessage, resumeClarify, compactConversation, clearThread, loadHistory }
 }
 
 // ── Sidebar loading hook ───────────────────────────────────────────────────────

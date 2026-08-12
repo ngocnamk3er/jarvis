@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react"
 import { useSession } from "next-auth/react"
-import { SendHorizontal, Loader2, Brain, ChevronDown, Check, Cpu, Bot, Paperclip, X, File, Unlock } from "lucide-react"
+import { SendHorizontal, Loader2, Brain, ChevronDown, Check, Cpu, Bot, Paperclip, X, File, Unlock, Minimize2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { apiFetch } from "@/lib/api-client"
 import { ThinkingEffort, Model } from "@/types/chat"
@@ -48,9 +48,14 @@ type Props = {
   // this by default (LangGraph merges the root run's config into the
   // subagent's), so leaving this unset is not a degraded state.
   initialSubagentModelId?: string | null
+  // Force-compacts the conversation via the compact_conversation tool (see
+  // chat_service.py's compact()). Omitted/no-op when there's no active
+  // conversation yet.
+  onCompact?: () => void
+  hasMessages?: boolean
 }
 
-export function ChatInput({ onSend, disabled, threadId, onCreateConversation, initialModelId, initialSubagentModelId }: Props) {
+export function ChatInput({ onSend, disabled, threadId, onCreateConversation, initialModelId, initialSubagentModelId, onCompact, hasMessages }: Props) {
   const { data: session } = useSession()
   const accessToken = session?.accessToken
   const { models } = useModels()
@@ -438,6 +443,25 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation, in
                   </div>
                 )}
               </div>
+
+              {/* Compact — force-summarizes the conversation now via the
+                  compact_conversation tool, instead of waiting for the
+                  automatic token-threshold trigger. */}
+              {onCompact && (
+                <button
+                  onClick={onCompact}
+                  disabled={disabled || !hasMessages}
+                  title="Compact conversation — summarize older messages to free up context"
+                  className={cn(
+                    "flex items-center justify-center size-7 rounded-full transition-colors",
+                    disabled || !hasMessages
+                      ? "text-gray-300 cursor-not-allowed"
+                      : "text-gray-400 hover:text-[#5661f6] hover:bg-[#EEF0FF]"
+                  )}
+                >
+                  <Minimize2 className="size-3.5" />
+                </button>
+              )}
             </div>
 
             <button
