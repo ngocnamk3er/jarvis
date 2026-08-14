@@ -41,7 +41,7 @@ export function ChatWindow() {
   const lastSentModel = useRef<Map<string, string>>(new Map())
   const lastSentSubagentModel = useRef<Map<string, string>>(new Map())
 
-  const { messages, isLoading, pendingHitl, pendingClarify, interrupted, sendMessage, resumeMessage, resumeClarify, compactConversation, clearThread, loadHistory } = useChat(activeId)
+  const { messages, isLoading, pendingHitl, pendingClarify, interrupted, contextTokens, sendMessage, resumeMessage, resumeClarify, compactConversation, clearThread, loadHistory } = useChat(activeId)
   const loadingThreadIds = useLoadingThreadIds()
   const [previewFile, setPreviewFile] = useState<GeneratedFile | null>(null)
 
@@ -137,6 +137,12 @@ export function ChatWindow() {
     null
   const resumeSubagentModel = models.find((m) => m.id === resumeSubagentModelId)
 
+  // Live value from this session's SSE stream overrides; else fall back to
+  // whatever was last persisted (loaded once via useConversations() on
+  // mount) — same pattern as resumeModelId above.
+  const displayedContextTokens =
+    contextTokens ?? conversations.find((c) => c.id === activeId)?.context_tokens ?? 0
+
   const handleRetry = () => {
     const lastUser = [...messages].reverse().find((m) => m.role === "user")
     if (!lastUser) return
@@ -218,6 +224,7 @@ export function ChatWindow() {
             }}
             onCompact={activeId ? () => compactConversation(resumeModel, resumeSubagentModel) : undefined}
             hasMessages={hasMessages}
+            contextTokens={displayedContextTokens}
           />
         </div>
 

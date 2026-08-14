@@ -128,6 +128,7 @@ export type StreamEvent =
   | { type: "hitl_request"; actions: HitlAction[]; review_configs: HitlReviewConfig[] }
   | { type: "clarify_request"; question: string; options?: string[] | null }
   | ({ type: "usage" } & TokenUsage)
+  | { type: "context_tokens"; tokens: number }
   | { type: "done" }
   | { type: "error"; message: string }
 
@@ -136,6 +137,9 @@ export type Conversation = {
   title: string
   last_model: string | null
   last_subagent_model: string | null
+  // Current context size (not lifetime total) — see backend
+  // Conversation.context_tokens for why this overwrites rather than sums.
+  context_tokens: number
   created_at: string
   updated_at: string
 }

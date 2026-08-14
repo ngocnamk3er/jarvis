@@ -53,9 +53,19 @@ type Props = {
   // conversation yet.
   onCompact?: () => void
   hasMessages?: boolean
+  // Current context size (see backend Conversation.context_tokens) — shown
+  // as a pill next to the Compact button so the number and the action live
+  // side by side.
+  contextTokens?: number
 }
 
-export function ChatInput({ onSend, disabled, threadId, onCreateConversation, initialModelId, initialSubagentModelId, onCompact, hasMessages }: Props) {
+// Must track graph.py's SummarizationMiddleware(trigger=("tokens", 60000)) —
+// AUTO is where auto-summarization kicks in, ELIGIBLE is where the manual
+// Compact tool becomes callable (SummarizationToolMiddleware's own ~50% gate).
+const CONTEXT_TOKENS_AUTO_TRIGGER = 60000
+const CONTEXT_TOKENS_ELIGIBLE = 30000
+
+export function ChatInput({ onSend, disabled, threadId, onCreateConversation, initialModelId, initialSubagentModelId, onCompact, hasMessages, contextTokens }: Props) {
   const { data: session } = useSession()
   const accessToken = session?.accessToken
   const { models } = useModels()
@@ -443,6 +453,24 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation, in
                   </div>
                 )}
               </div>
+
+              {/* Context-size pill — read-only gauge, sits right next to
+                  Compact so the signal and the action pair visually. */}
+              {hasMessages && contextTokens !== undefined && (
+                <span
+                  title={`~${contextTokens.toLocaleString()} tokens of context — auto-compacts at ${CONTEXT_TOKENS_AUTO_TRIGGER.toLocaleString()}`}
+                  className={cn(
+                    "flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                    contextTokens >= CONTEXT_TOKENS_AUTO_TRIGGER
+                      ? "bg-red-50 text-red-600"
+                      : contextTokens >= CONTEXT_TOKENS_ELIGIBLE
+                      ? "bg-amber-50 text-amber-600"
+                      : "bg-[#EEF0FF] text-[#5661f6]"
+                  )}
+                >
+                  {(contextTokens / 1000).toFixed(1)}k / {CONTEXT_TOKENS_AUTO_TRIGGER / 1000}k
+                </span>
+              )}
 
               {/* Compact — force-summarizes the conversation now via the
                   compact_conversation tool, instead of waiting for the

@@ -11,6 +11,11 @@ const _loading = new Map<string, boolean>()
 const _hitl = new Map<string, PendingHitl | null>()
 const _clarify = new Map<string, PendingClarify | null>()
 const _interrupted = new Map<string, boolean>()
+// Current-context-size gauge per thread, updated live from the
+// context_tokens SSE event — falls back to the conversations list's
+// persisted value (see chat-window.tsx) until the first stream in this
+// session updates it.
+const _contextTokens = new Map<string, number>()
 
 // Per-thread re-render subscribers
 const _subs = new Map<string, Set<() => void>>()
@@ -220,6 +225,11 @@ async function runStream(body: ReadableStream<Uint8Array>, threadId: string, tar
           }))
           break
 
+        case "context_tokens":
+          _contextTokens.set(threadId, event.tokens)
+          _notify(threadId)
+          break
+
         case "hitl_request":
           _hitl.set(threadId, { actions: event.actions, review_configs: event.review_configs })
           _notify(threadId)
@@ -263,6 +273,7 @@ export function useChat(threadId: string | null) {
   const pendingHitl = threadId ? (_hitl.get(threadId) ?? null) : null
   const pendingClarify = threadId ? (_clarify.get(threadId) ?? null) : null
   const interrupted = threadId ? (_interrupted.get(threadId) ?? false) : false
+  const contextTokens = threadId ? (_contextTokens.get(threadId) ?? null) : null
 
   const loadHistory = useCallback(async (id: string): Promise<boolean> => {
     const res = await apiFetch(`/api/v1/conversations/${id}/messages`, accessToken)
@@ -473,7 +484,7 @@ export function useChat(threadId: string | null) {
     [threadId, accessToken, _doStream]
   )
 
-  return { messages, isLoading, pendingHitl, pendingClarify, interrupted, sendMessage, resumeMessage, resumeClarify, compactConversation, clearThread, loadHistory }
+  return { messages, isLoading, pendingHitl, pendingClarify, interrupted, contextTokens, sendMessage, resumeMessage, resumeClarify, compactConversation, clearThread, loadHistory }
 }
 
 // ── Sidebar loading hook ───────────────────────────────────────────────────────
