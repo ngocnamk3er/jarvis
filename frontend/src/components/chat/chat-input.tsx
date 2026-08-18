@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react"
 import { useSession } from "next-auth/react"
-import { SendHorizontal, Loader2, Brain, ChevronDown, Check, Cpu, Bot, Paperclip, X, File, Unlock, Minimize2 } from "lucide-react"
+import { SendHorizontal, Loader2, Brain, ChevronDown, Check, Cpu, Bot, Paperclip, X, File, Unlock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { apiFetch } from "@/lib/api-client"
 import { ThinkingEffort, Model } from "@/types/chat"
@@ -48,24 +48,14 @@ type Props = {
   // this by default (LangGraph merges the root run's config into the
   // subagent's), so leaving this unset is not a degraded state.
   initialSubagentModelId?: string | null
-  // Force-compacts the conversation via the compact_conversation tool (see
-  // chat_service.py's compact()). Omitted/no-op when there's no active
-  // conversation yet.
-  onCompact?: () => void
   hasMessages?: boolean
   // Current context size (see backend Conversation.context_tokens) — shown
-  // as a pill next to the Compact button so the number and the action live
-  // side by side.
+  // as a pill, and compared against the selected model's own contextWindow
+  // to hard-block sending once the conversation is full for that model.
   contextTokens?: number
 }
 
-// Must track graph.py's SummarizationMiddleware(trigger=("tokens", 60000)) —
-// AUTO is where auto-summarization kicks in, ELIGIBLE is where the manual
-// Compact tool becomes callable (SummarizationToolMiddleware's own ~50% gate).
-const CONTEXT_TOKENS_AUTO_TRIGGER = 60000
-const CONTEXT_TOKENS_ELIGIBLE = 30000
-
-export function ChatInput({ onSend, disabled, threadId, onCreateConversation, initialModelId, initialSubagentModelId, onCompact, hasMessages, contextTokens }: Props) {
+export function ChatInput({ onSend, disabled, threadId, onCreateConversation, initialModelId, initialSubagentModelId, hasMessages, contextTokens }: Props) {
   const { data: session } = useSession()
   const accessToken = session?.accessToken
   const { models } = useModels()
@@ -202,11 +192,19 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation, in
   }, [model, effort])
 
   const currentEffort = EFFORT_OPTIONS.find((o) => o.value === effort) ?? availableEffortOptions[0]
-  const canSend = !disabled && !!model && (value.trim().length > 0 || attachedFiles.length > 0)
+  const isOverContextWindow = !!model && contextTokens !== undefined && contextTokens >= model.contextWindow
+  const canSend = !disabled && !!model && !isOverContextWindow && (value.trim().length > 0 || attachedFiles.length > 0)
 
   return (
     <div className="px-8 pb-7 pt-3">
       <div className="max-w-3xl mx-auto">
+        {isOverContextWindow && model && (
+          <div className="flex justify-center pb-2">
+            <div className="flex items-center gap-2 bg-white border border-red-200 text-red-700 rounded-full px-4 py-2 text-[12px] shadow-sm">
+              This conversation has reached {model.name}&apos;s context window ({(model.contextWindow / 1000).toFixed(0)}k tokens). Start a new conversation to continue.
+            </div>
+          </div>
+        )}
         <div className="flex flex-col bg-white rounded-3xl px-5 py-3 shadow-sm border border-gray-100/80 gap-2">
 
           {/* Attached file chips */}
@@ -454,41 +452,22 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation, in
                 )}
               </div>
 
-              {/* Context-size pill — read-only gauge, sits right next to
-                  Compact so the signal and the action pair visually. */}
-              {hasMessages && contextTokens !== undefined && (
+              {/* Context-size pill — read-only gauge against the selected
+                  model's real context window (see Model.contextWindow). */}
+              {hasMessages && contextTokens !== undefined && model && (
                 <span
-                  title={`~${contextTokens.toLocaleString()} tokens of context — auto-compacts at ${CONTEXT_TOKENS_AUTO_TRIGGER.toLocaleString()}`}
+                  title={`~${contextTokens.toLocaleString()} tokens of context — ${model.name}'s window is ${model.contextWindow.toLocaleString()}`}
                   className={cn(
                     "flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                    contextTokens >= CONTEXT_TOKENS_AUTO_TRIGGER
+                    contextTokens >= model.contextWindow
                       ? "bg-red-50 text-red-600"
-                      : contextTokens >= CONTEXT_TOKENS_ELIGIBLE
+                      : contextTokens >= model.contextWindow * 0.7
                       ? "bg-amber-50 text-amber-600"
                       : "bg-[#EEF0FF] text-[#5661f6]"
                   )}
                 >
-                  {(contextTokens / 1000).toFixed(1)}k / {CONTEXT_TOKENS_AUTO_TRIGGER / 1000}k
+                  {(contextTokens / 1000).toFixed(1)}k / {(model.contextWindow / 1000).toFixed(0)}k
                 </span>
-              )}
-
-              {/* Compact — force-summarizes the conversation now via the
-                  compact_conversation tool, instead of waiting for the
-                  automatic token-threshold trigger. */}
-              {onCompact && (
-                <button
-                  onClick={onCompact}
-                  disabled={disabled || !hasMessages}
-                  title="Compact conversation — summarize older messages to free up context"
-                  className={cn(
-                    "flex items-center justify-center size-7 rounded-full transition-colors",
-                    disabled || !hasMessages
-                      ? "text-gray-300 cursor-not-allowed"
-                      : "text-gray-400 hover:text-[#5661f6] hover:bg-[#EEF0FF]"
-                  )}
-                >
-                  <Minimize2 className="size-3.5" />
-                </button>
               )}
             </div>
 

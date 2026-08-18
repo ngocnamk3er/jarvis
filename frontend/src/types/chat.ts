@@ -9,6 +9,10 @@ export type Model = {
   inputPrice: string
   outputPrice: string
   context: string
+  // Numeric max context window (see backend AVAILABLE_MODELS.contextWindow)
+  // — used to hard-block sending once a conversation's context_tokens
+  // reaches it, instead of the "context" display string above.
+  contextWindow: number
   size: string
   default?: boolean
   // Which thinking_effort levels are actually meaningful/safe for this

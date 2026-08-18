@@ -41,7 +41,7 @@ export function ChatWindow() {
   const lastSentModel = useRef<Map<string, string>>(new Map())
   const lastSentSubagentModel = useRef<Map<string, string>>(new Map())
 
-  const { messages, isLoading, pendingHitl, pendingClarify, interrupted, contextTokens, sendMessage, resumeMessage, resumeClarify, compactConversation, clearThread, loadHistory } = useChat(activeId)
+  const { messages, isLoading, pendingHitl, pendingClarify, interrupted, contextTokens, sendMessage, resumeMessage, resumeClarify, clearThread, loadHistory } = useChat(activeId)
   const loadingThreadIds = useLoadingThreadIds()
   const [previewFile, setPreviewFile] = useState<GeneratedFile | null>(null)
 
@@ -222,7 +222,6 @@ export function ChatWindow() {
               activate(conv.id)
               return conv.id
             }}
-            onCompact={activeId ? () => compactConversation(resumeModel, resumeSubagentModel) : undefined}
             hasMessages={hasMessages}
             contextTokens={displayedContextTokens}
           />
