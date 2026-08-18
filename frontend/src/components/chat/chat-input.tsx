@@ -1,10 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react"
-import { useSession } from "next-auth/react"
-import { SendHorizontal, Square, Loader2, Brain, ChevronDown, Check, Cpu, Bot, Paperclip, X, File, Unlock } from "lucide-react"
+import { SendHorizontal, Square, Loader2, Brain, ChevronDown, Check, Cpu, Bot, Unlock } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { apiFetch } from "@/lib/api-client"
 import { ThinkingEffort, Model } from "@/types/chat"
 import { useModels } from "@/hooks/use-models"
 
@@ -32,19 +30,15 @@ function OpenWeightBadge({ huggingFaceId }: { huggingFaceId: string | null }) {
   )
 }
 
-type AttachedFile = { name: string; virtualPath: string }
-
 type Props = {
   onSend: (content: string, effort: ThinkingEffort, model: Model, subagentModel?: Model) => void
   disabled: boolean
   // True specifically while a stream is in flight (a subset of `disabled`,
-  // which also covers pendingHitl/pendingClarify) — the send button shows
-  // Stop instead of Send only in this narrower case, since Stop cancelling
-  // a paused-for-approval turn wouldn't mean the same thing.
+  // which also covers pendingClarify) — the send button shows Stop instead
+  // of Send only in this narrower case, since Stop cancelling a
+  // paused-for-approval turn wouldn't mean the same thing.
   isLoading?: boolean
   onStop?: () => void
-  threadId: string | null
-  onCreateConversation?: () => Promise<string>
   // Last model actually used for this conversation (persisted server-side —
   // see touch_conversation in chat.py), so switching back to it shows what
   // was really used instead of always resetting to the global default.
@@ -61,9 +55,7 @@ type Props = {
   contextTokens?: number
 }
 
-export function ChatInput({ onSend, disabled, isLoading, onStop, threadId, onCreateConversation, initialModelId, initialSubagentModelId, hasMessages, contextTokens }: Props) {
-  const { data: session } = useSession()
-  const accessToken = session?.accessToken
+export function ChatInput({ onSend, disabled, isLoading, onStop, initialModelId, initialSubagentModelId, hasMessages, contextTokens }: Props) {
   const { models } = useModels()
   const [value, setValue] = useState("")
   const [effort, setEffort] = useState<ThinkingEffort>("high")
@@ -72,14 +64,11 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, threadId, onCre
   const [effortOpen, setEffortOpen] = useState(false)
   const [modelOpen, setModelOpen] = useState(false)
   const [subagentModelOpen, setSubagentModelOpen] = useState(false)
-  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
-  const [uploading, setUploading] = useState(false)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const effortRef = useRef<HTMLDivElement>(null)
   const modelRef = useRef<HTMLDivElement>(null)
   const subagentModelRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const resize = () => {
     const el = textareaRef.current
@@ -90,17 +79,10 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, threadId, onCre
 
   const submit = () => {
     const trimmed = value.trim()
-    if ((!trimmed && attachedFiles.length === 0) || disabled || !model) return
+    if (!trimmed || disabled || !model) return
 
-    let content = trimmed
-    if (attachedFiles.length > 0) {
-      const fileList = attachedFiles.map((f) => `📎 ${f.name} → ${f.virtualPath}`).join("\n")
-      content = trimmed ? `${trimmed}\n\n${fileList}` : fileList
-    }
-
-    onSend(content, effort, model, subagentModel ?? undefined)
+    onSend(trimmed, effort, model, subagentModel ?? undefined)
     setValue("")
-    setAttachedFiles([])
     if (textareaRef.current) textareaRef.current.style.height = "auto"
   }
 
@@ -108,48 +90,6 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, threadId, onCre
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       submit()
-    }
-  }
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? [])
-    if (files.length === 0) return
-
-    let tid = threadId
-    if (!tid) {
-      if (!onCreateConversation) return
-      tid = await onCreateConversation()
-    }
-
-    setUploading(true)
-    try {
-      const uploaded: AttachedFile[] = []
-      for (const file of files) {
-        const form = new FormData()
-        form.append("file", file)
-        const res = await apiFetch(`/api/v1/files/upload/${tid}`, accessToken, {
-          method: "POST",
-          body: form,
-        })
-        if (res.ok) {
-          const data = await res.json()
-          uploaded.push({ name: data.filename, virtualPath: data.virtual_path })
-        }
-      }
-      setAttachedFiles((prev) => [...prev, ...uploaded])
-    } finally {
-      setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ""
-    }
-  }
-
-  const removeFile = (idx: number) => {
-    const file = attachedFiles[idx]
-    setAttachedFiles((prev) => prev.filter((_, i) => i !== idx))
-    if (file && threadId) {
-      apiFetch(`/api/v1/files/upload/${threadId}/${encodeURIComponent(file.name)}`, accessToken, {
-        method: "DELETE",
-      }).catch(() => {})
     }
   }
 
@@ -199,7 +139,7 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, threadId, onCre
 
   const currentEffort = EFFORT_OPTIONS.find((o) => o.value === effort) ?? availableEffortOptions[0]
   const isOverContextWindow = !!model && contextTokens !== undefined && contextTokens >= model.contextWindow
-  const canSend = !disabled && !!model && !isOverContextWindow && (value.trim().length > 0 || attachedFiles.length > 0)
+  const canSend = !disabled && !!model && !isOverContextWindow && value.trim().length > 0
 
   return (
     <div className="px-8 pb-7 pt-3">
@@ -212,27 +152,6 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, threadId, onCre
           </div>
         )}
         <div className="flex flex-col bg-white rounded-3xl px-5 py-3 shadow-sm border border-gray-100/80 gap-2">
-
-          {/* Attached file chips */}
-          {attachedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {attachedFiles.map((f, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-1.5 bg-[#EEF0FF] rounded-full px-2.5 py-1 max-w-[200px]"
-                >
-                  <File className="size-3 text-[#5661f6] shrink-0" />
-                  <span className="text-[11px] font-medium text-[#5661f6] truncate">{f.name}</span>
-                  <button
-                    onClick={() => removeFile(i)}
-                    className="text-[#5661f6] hover:text-[#4550e0] shrink-0 ml-0.5"
-                  >
-                    <X className="size-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
 
           <textarea
             ref={textareaRef}
@@ -248,29 +167,6 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, threadId, onCre
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {/* File upload */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={handleFileChange}
-                disabled={uploading}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading || disabled}
-                title="Attach files"
-                className={cn(
-                  "flex items-center justify-center size-7 rounded-full transition-colors",
-                  uploading || disabled
-                    ? "text-gray-300 cursor-not-allowed"
-                    : "text-gray-400 hover:text-[#5661f6] hover:bg-[#EEF0FF]"
-                )}
-              >
-                {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Paperclip className="size-3.5" />}
-              </button>
-
               {/* Thinking effort selector — options filtered per-model to
                   only levels verified meaningful/safe for it (see
                   Model.effortOptions / AVAILABLE_MODELS for the evidence).

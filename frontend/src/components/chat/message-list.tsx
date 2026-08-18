@@ -3,18 +3,13 @@
 import { useEffect, useRef, useCallback } from "react"
 import { Message } from "@/types/chat"
 import { MessageItem } from "./message-item"
-import { GeneratedFile } from "./file-tray"
 
 const NEAR_BOTTOM_THRESHOLD = 120
 
 export function MessageList({
   messages,
-  previewFile,
-  onPreviewFile,
 }: {
   messages: Message[]
-  previewFile: GeneratedFile | null
-  onPreviewFile: (f: GeneratedFile | null) => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -62,8 +57,6 @@ export function MessageList({
           <MessageItem
             key={msg.id}
             message={msg}
-            previewFile={previewFile}
-            onPreviewFile={onPreviewFile}
           />
         ))}
         <div ref={bottomRef} />

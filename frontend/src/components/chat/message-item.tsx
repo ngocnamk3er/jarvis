@@ -13,7 +13,6 @@ import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { Message, MessagePart, ToolCall, TokenUsage } from "@/types/chat"
 import { ToolBadge, ToolGroupBadge } from "./tool-badge"
 import { TodoList } from "./todo-list"
-import { extractFilesFromMessage, FileChips, GeneratedFile } from "./file-tray"
 
 const SvgDiagram = dynamic(
   () => import("./svg-diagram").then((m) => m.SvgDiagram),
@@ -240,12 +239,8 @@ function UsageFooter({ usage, isStreaming }: { usage: TokenUsage[]; isStreaming:
 
 export function MessageItem({
   message,
-  previewFile,
-  onPreviewFile,
 }: {
   message: Message
-  previewFile: GeneratedFile | null
-  onPreviewFile: (f: GeneratedFile | null) => void
 }) {
   const [copied, setCopied] = useState(false)
 
@@ -462,14 +457,6 @@ export function MessageItem({
               />
             ))}
           </div>
-        )}
-
-        {!message.isStreaming && (
-          <FileChips
-            files={extractFilesFromMessage(message)}
-            previewFile={previewFile}
-            onSelect={onPreviewFile}
-          />
         )}
       </div>
 

@@ -10,8 +10,6 @@ import { Sidebar } from "./sidebar"
 import { EmptyState } from "./empty-state"
 import { MessageList } from "./message-list"
 import { ChatInput } from "./chat-input"
-import { PreviewPanel, GeneratedFile } from "./file-tray"
-import { HitlApproval } from "./hitl-approval"
 import { ClarifyRequest } from "./clarify-request"
 
 // Module-level set to track which threads have already had history loaded
@@ -41,9 +39,8 @@ export function ChatWindow() {
   const lastSentModel = useRef<Map<string, string>>(new Map())
   const lastSentSubagentModel = useRef<Map<string, string>>(new Map())
 
-  const { messages, isLoading, pendingHitl, pendingClarify, interrupted, stopped, contextTokens, sendMessage, resumeMessage, resumeClarify, stopMessage, clearThread, loadHistory } = useChat(activeId)
+  const { messages, isLoading, pendingClarify, interrupted, stopped, contextTokens, sendMessage, resumeClarify, stopMessage, clearThread, loadHistory } = useChat(activeId)
   const loadingThreadIds = useLoadingThreadIds()
-  const [previewFile, setPreviewFile] = useState<GeneratedFile | null>(null)
 
   async function openConversation(id: string) {
     // Skip if already loaded (may be mid-stream when switching back)
@@ -122,9 +119,9 @@ export function ChatWindow() {
     }
   }
 
-  // Same model this conversation is already using — resume must carry it
-  // forward explicitly, since the backend has no other way to know which
-  // model an approve/reject should continue with (see chat_service.resume).
+  // Same model this conversation is already using — resuming a clarify
+  // answer must carry it forward explicitly, since the backend has no other
+  // way to know which model to continue with (see chat_service.resume_clarify).
   const resumeModelId =
     (activeId && lastSentModel.current.get(activeId)) ??
     conversations.find((c) => c.id === activeId)?.last_model ??
@@ -166,17 +163,9 @@ export function ChatWindow() {
       <div className="flex flex-1 min-w-0 overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden">
           {hasMessages ? (
-            <MessageList messages={messages} previewFile={previewFile} onPreviewFile={setPreviewFile} />
+            <MessageList messages={messages} />
           ) : (
             <EmptyState />
-          )}
-
-          {pendingHitl && !isLoading && (
-            <HitlApproval
-              hitl={pendingHitl}
-              onApprove={() => resumeMessage("approve", resumeModel, resumeSubagentModel)}
-              onReject={() => resumeMessage("reject", resumeModel, resumeSubagentModel)}
-            />
           )}
 
           {pendingClarify && !isLoading && (
@@ -186,7 +175,7 @@ export function ChatWindow() {
             />
           )}
 
-          {(interrupted || stopped) && !isLoading && !pendingHitl && !pendingClarify && (
+          {(interrupted || stopped) && !isLoading && !pendingClarify && (
             <div className="flex justify-center pb-2">
               <div className="flex items-center gap-2.5 bg-white border border-amber-200 text-amber-700 rounded-full px-4 py-2 text-[12px] shadow-sm">
                 <span>{stopped ? "Stopped" : "Response was interrupted"}</span>
@@ -204,10 +193,9 @@ export function ChatWindow() {
           <ChatInput
             key={activeId}
             onSend={handleSend}
-            disabled={isLoading || !!pendingHitl || !!pendingClarify}
+            disabled={isLoading || !!pendingClarify}
             isLoading={isLoading}
             onStop={stopMessage}
-            threadId={activeId}
             initialModelId={
               (activeId && lastSentModel.current.get(activeId)) ??
               conversations.find((c) => c.id === activeId)?.last_model ??
@@ -218,20 +206,10 @@ export function ChatWindow() {
               conversations.find((c) => c.id === activeId)?.last_subagent_model ??
               null
             }
-            onCreateConversation={async () => {
-              const conv = await create("New conversation")
-              _historyLoaded.add(conv.id)
-              activate(conv.id)
-              return conv.id
-            }}
             hasMessages={hasMessages}
             contextTokens={displayedContextTokens}
           />
         </div>
-
-        {previewFile && (
-          <PreviewPanel file={previewFile} onClose={() => setPreviewFile(null)} />
-        )}
       </div>
     </div>
   )
