@@ -11,6 +11,10 @@ const _loading = new Map<string, boolean>()
 const _hitl = new Map<string, PendingHitl | null>()
 const _clarify = new Map<string, PendingClarify | null>()
 const _interrupted = new Map<string, boolean>()
+// Set when the user explicitly clicked Stop (as opposed to _interrupted,
+// which reflects a network/reload-triggered cutoff detected on reload) —
+// live-session only, not persisted, so it's not touched by loadHistory.
+const _stopped = new Map<string, boolean>()
 // Current-context-size gauge per thread, updated live from the
 // context_tokens SSE event — falls back to the conversations list's
 // persisted value (see chat-window.tsx) until the first stream in this
@@ -240,6 +244,11 @@ async function runStream(body: ReadableStream<Uint8Array>, threadId: string, tar
           _notify(threadId)
           break
 
+        case "stopped":
+          _stopped.set(threadId, true)
+          updateMsg((m) => ({ ...m, isStreaming: false, parts: m.parts.map(p => p.type === "thinking" ? { ...p, isStreaming: false } : p) }))
+          break
+
         case "done":
           updateMsg((m) => ({ ...m, isStreaming: false, parts: m.parts.map(p => p.type === "thinking" ? { ...p, isStreaming: false } : p) }))
           break
@@ -273,6 +282,7 @@ export function useChat(threadId: string | null) {
   const pendingHitl = threadId ? (_hitl.get(threadId) ?? null) : null
   const pendingClarify = threadId ? (_clarify.get(threadId) ?? null) : null
   const interrupted = threadId ? (_interrupted.get(threadId) ?? false) : false
+  const stopped = threadId ? (_stopped.get(threadId) ?? false) : false
   const contextTokens = threadId ? (_contextTokens.get(threadId) ?? null) : null
 
   const loadHistory = useCallback(async (id: string): Promise<boolean> => {
@@ -297,6 +307,7 @@ export function useChat(threadId: string | null) {
     _hitl.set(threadId, null)
     _clarify.set(threadId, null)
     _interrupted.set(threadId, false)
+    _stopped.set(threadId, false)
     _notify(threadId)
   }, [threadId])
 
@@ -320,6 +331,7 @@ export function useChat(threadId: string | null) {
       _hitl.set(threadId, null)
       _clarify.set(threadId, null)
       _interrupted.set(threadId, false)
+      _stopped.set(threadId, false)
 
       const userMsg: Message = { id: makeId(), role: "user", parts: [{ type: "text", content }], isStreaming: false }
       const assistantId = makeId()
@@ -363,6 +375,7 @@ export function useChat(threadId: string | null) {
 
       _hitl.set(threadId, null)
       _clarify.set(threadId, null)
+      _stopped.set(threadId, false)
       _msgs.set(threadId, msgs.map(m => {
         if (m.id !== resumeId) return m
         // Resuming re-executes the interrupted tool call from scratch with a
@@ -415,6 +428,7 @@ export function useChat(threadId: string | null) {
 
       _clarify.set(threadId, null)
       _hitl.set(threadId, null)
+      _stopped.set(threadId, false)
       _msgs.set(threadId, msgs.map(m => {
         if (m.id !== resumeId) return m
         // Same reasoning as resumeMessage: resuming replays the interrupted
@@ -453,7 +467,20 @@ export function useChat(threadId: string | null) {
     [threadId, accessToken, _doStream]
   )
 
-  return { messages, isLoading, pendingHitl, pendingClarify, interrupted, contextTokens, sendMessage, resumeMessage, resumeClarify, clearThread, loadHistory }
+  const stopMessage = useCallback(async () => {
+    if (!threadId) return
+    // No need to touch local state here: the in-flight runStream() for this
+    // thread will receive the backend's "stopped" + "done" SSE lines once
+    // chat_service.stop() cancels the run, and _doStream's `finally` clears
+    // isLoading the same way it does for a normal completion.
+    await apiFetch("/api/v1/chat/stop", accessToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ thread_id: threadId }),
+    }).catch(() => {})
+  }, [threadId, accessToken])
+
+  return { messages, isLoading, pendingHitl, pendingClarify, interrupted, stopped, contextTokens, sendMessage, resumeMessage, resumeClarify, stopMessage, clearThread, loadHistory }
 }
 
 // ── Sidebar loading hook ───────────────────────────────────────────────────────

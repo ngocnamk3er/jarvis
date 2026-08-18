@@ -41,7 +41,7 @@ export function ChatWindow() {
   const lastSentModel = useRef<Map<string, string>>(new Map())
   const lastSentSubagentModel = useRef<Map<string, string>>(new Map())
 
-  const { messages, isLoading, pendingHitl, pendingClarify, interrupted, contextTokens, sendMessage, resumeMessage, resumeClarify, clearThread, loadHistory } = useChat(activeId)
+  const { messages, isLoading, pendingHitl, pendingClarify, interrupted, stopped, contextTokens, sendMessage, resumeMessage, resumeClarify, stopMessage, clearThread, loadHistory } = useChat(activeId)
   const loadingThreadIds = useLoadingThreadIds()
   const [previewFile, setPreviewFile] = useState<GeneratedFile | null>(null)
 
@@ -186,10 +186,10 @@ export function ChatWindow() {
             />
           )}
 
-          {interrupted && !isLoading && !pendingHitl && !pendingClarify && (
+          {(interrupted || stopped) && !isLoading && !pendingHitl && !pendingClarify && (
             <div className="flex justify-center pb-2">
               <div className="flex items-center gap-2.5 bg-white border border-amber-200 text-amber-700 rounded-full px-4 py-2 text-[12px] shadow-sm">
-                <span>Response was interrupted</span>
+                <span>{stopped ? "Stopped" : "Response was interrupted"}</span>
                 <button
                   onClick={handleRetry}
                   className="flex items-center gap-1 font-semibold hover:text-amber-900 transition-colors"
@@ -205,6 +205,8 @@ export function ChatWindow() {
             key={activeId}
             onSend={handleSend}
             disabled={isLoading || !!pendingHitl || !!pendingClarify}
+            isLoading={isLoading}
+            onStop={stopMessage}
             threadId={activeId}
             initialModelId={
               (activeId && lastSentModel.current.get(activeId)) ??

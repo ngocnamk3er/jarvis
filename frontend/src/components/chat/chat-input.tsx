@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react"
 import { useSession } from "next-auth/react"
-import { SendHorizontal, Loader2, Brain, ChevronDown, Check, Cpu, Bot, Paperclip, X, File, Unlock } from "lucide-react"
+import { SendHorizontal, Square, Loader2, Brain, ChevronDown, Check, Cpu, Bot, Paperclip, X, File, Unlock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { apiFetch } from "@/lib/api-client"
 import { ThinkingEffort, Model } from "@/types/chat"
@@ -37,6 +37,12 @@ type AttachedFile = { name: string; virtualPath: string }
 type Props = {
   onSend: (content: string, effort: ThinkingEffort, model: Model, subagentModel?: Model) => void
   disabled: boolean
+  // True specifically while a stream is in flight (a subset of `disabled`,
+  // which also covers pendingHitl/pendingClarify) — the send button shows
+  // Stop instead of Send only in this narrower case, since Stop cancelling
+  // a paused-for-approval turn wouldn't mean the same thing.
+  isLoading?: boolean
+  onStop?: () => void
   threadId: string | null
   onCreateConversation?: () => Promise<string>
   // Last model actually used for this conversation (persisted server-side —
@@ -55,7 +61,7 @@ type Props = {
   contextTokens?: number
 }
 
-export function ChatInput({ onSend, disabled, threadId, onCreateConversation, initialModelId, initialSubagentModelId, hasMessages, contextTokens }: Props) {
+export function ChatInput({ onSend, disabled, isLoading, onStop, threadId, onCreateConversation, initialModelId, initialSubagentModelId, hasMessages, contextTokens }: Props) {
   const { data: session } = useSession()
   const accessToken = session?.accessToken
   const { models } = useModels()
@@ -472,16 +478,21 @@ export function ChatInput({ onSend, disabled, threadId, onCreateConversation, in
             </div>
 
             <button
-              onClick={submit}
-              disabled={!canSend}
+              onClick={isLoading ? onStop : submit}
+              disabled={isLoading ? !onStop : !canSend}
+              title={isLoading ? "Stop generating" : undefined}
               className={cn(
                 "size-9 rounded-full flex items-center justify-center shrink-0 transition-colors",
-                !canSend
+                isLoading
+                  ? "bg-gray-700 text-white hover:bg-gray-900"
+                  : !canSend
                   ? "bg-gray-100 text-gray-300 cursor-not-allowed"
                   : "bg-[#5661f6] text-white hover:bg-[#4550e0]"
               )}
             >
-              {disabled ? (
+              {isLoading ? (
+                <Square className="size-3.5 fill-current" />
+              ) : disabled ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <SendHorizontal className="size-4" />

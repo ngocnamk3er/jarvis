@@ -133,6 +133,7 @@ export type StreamEvent =
   | { type: "clarify_request"; question: string; options?: string[] | null }
   | ({ type: "usage" } & TokenUsage)
   | { type: "context_tokens"; tokens: number }
+  | { type: "stopped" }
   | { type: "done" }
   | { type: "error"; message: string }
 
