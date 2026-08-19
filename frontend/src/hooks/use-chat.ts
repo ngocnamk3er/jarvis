@@ -36,11 +36,6 @@ function _setLoading(tid: string, val: boolean) {
   _notify(tid)
 }
 
-export function subscribeLoadingChange(fn: () => void): () => void {
-  _loadingSubs.add(fn)
-  return () => _loadingSubs.delete(fn)
-}
-
 export function getLoadingSet(): ReadonlySet<string> {
   const s = new Set<string>()
   _loading.forEach((v, k) => { if (v) s.add(k) })
@@ -294,15 +289,6 @@ export function useChat(threadId: string | null) {
     return data.is_pending ?? false
   }, [accessToken])
 
-  const clearThread = useCallback(() => {
-    if (!threadId) return
-    _msgs.set(threadId, [])
-    _clarify.set(threadId, null)
-    _interrupted.set(threadId, false)
-    _stopped.set(threadId, false)
-    _notify(threadId)
-  }, [threadId])
-
   const _doStream = useCallback(async (body: ReadableStream<Uint8Array>, tid: string, targetId: string) => {
     _setLoading(tid, true)
     try {
@@ -417,7 +403,7 @@ export function useChat(threadId: string | null) {
     }).catch(() => {})
   }, [threadId, accessToken])
 
-  return { messages, isLoading, pendingClarify, interrupted, stopped, contextTokens, sendMessage, resumeClarify, stopMessage, clearThread, loadHistory }
+  return { messages, isLoading, pendingClarify, interrupted, stopped, contextTokens, sendMessage, resumeClarify, stopMessage, loadHistory }
 }
 
 // ── Sidebar loading hook ───────────────────────────────────────────────────────

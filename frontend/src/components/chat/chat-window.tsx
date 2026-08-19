@@ -39,7 +39,7 @@ export function ChatWindow() {
   const lastSentModel = useRef<Map<string, string>>(new Map())
   const lastSentSubagentModel = useRef<Map<string, string>>(new Map())
 
-  const { messages, isLoading, pendingClarify, interrupted, stopped, contextTokens, sendMessage, resumeClarify, stopMessage, clearThread, loadHistory } = useChat(activeId)
+  const { messages, isLoading, pendingClarify, interrupted, stopped, contextTokens, sendMessage, resumeClarify, stopMessage, loadHistory } = useChat(activeId)
   const loadingThreadIds = useLoadingThreadIds()
 
   async function openConversation(id: string) {
