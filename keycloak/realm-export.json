@@ -26,10 +26,13 @@
       "implicitFlowEnabled": false,
       "redirectUris": [
         "http://localhost:3000/api/auth/callback/keycloak",
-        "http://localhost:3000/*"
+        "http://localhost:3000/*",
+        "http://jarvis.local/api/auth/callback/keycloak",
+        "http://jarvis.local/*"
       ],
       "webOrigins": [
-        "http://localhost:3000"
+        "http://localhost:3000",
+        "http://jarvis.local"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
