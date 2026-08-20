@@ -7,13 +7,22 @@ pipeline {
     // manifests reference (they use host.minikube.internal, see
     // k8s/kustomization.yaml).
     REGISTRY = "localhost:5050/root/jarvis"
-    IMAGE_TAG = "${env.GIT_COMMIT.take(8)}"
   }
 
   stages {
     stage('Checkout') {
       steps {
         checkout scm
+        // env.GIT_COMMIT here is unreliable — it reflects whatever commit
+        // Jenkins last used to fetch *this Jenkinsfile* (a separate,
+        // earlier checkout Jenkins does before the pipeline even starts),
+        // not necessarily the commit checkout scm just resolved above.
+        // Confirmed live: a build tagged its images with a stale SHA from
+        // several commits back, silently deploying old code. Read the
+        // workspace's actual HEAD instead.
+        script {
+          env.IMAGE_TAG = sh(script: 'git rev-parse --short=8 HEAD', returnStdout: true).trim()
+        }
       }
     }
 
