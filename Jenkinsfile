@@ -28,9 +28,16 @@ pipeline {
         dir('frontend') {
           script {
             docker.image('node:22-alpine').inside {
-              sh 'npm ci'
-              sh 'npm run lint'
-              sh 'npm run build'
+              // This host's IPv6 path is broken (see backend/Dockerfile) —
+              // node:22-alpine has no /etc/gai.conf fix baked in like our
+              // own images do, so npm's registry requests hit the same
+              // hang/timeout pattern. --dns-result-order is Node's
+              // equivalent IPv4-preference knob.
+              withEnv(['NODE_OPTIONS=--dns-result-order=ipv4first']) {
+                sh 'npm ci'
+                sh 'npm run lint'
+                sh 'npm run build'
+              }
             }
           }
         }
