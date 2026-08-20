@@ -6,8 +6,34 @@ services:
     shm_size: "256m"
     environment:
       GITLAB_OMNIBUS_CONFIG: |
+        # "localhost" (not "gitlab") — the container registry's JWT auth
+        # realm is derived from external_url's host (confirmed live via
+        # /var/opt/gitlab/registry/config.yml: "realm: http://<host>:8929/jwt/auth"),
+        # and registry auth happens on the HOST's Docker daemon (Jenkins
+        # pushes via the mounted socket), which can't resolve "gitlab" —
+        # only the citools Docker network can. The earlier hypothesis that
+        # gitlab-plugin's push trigger needed external_url to match
+        # "gitlab" for the webhook to fire was wrong (confirmed live after
+        # reverting this back to localhost: webhook still triggers fine —
+        # the real fix for that was the trigger class name, see
+        # Jenkinsfile/job config history). Jenkins' own SCM/git-push URLs
+        # use "gitlab" instead (Jenkins-side config, independent of what
+        # GitLab calls itself here).
         external_url 'http://localhost:8929'
         registry_external_url 'http://localhost:5050'
+        # The registry's JWT auth realm defaults to external_url
+        # (registry.rb: token_realm ||= external_url), which is a single
+        # global value — but it needs to be reachable from two different
+        # network contexts with two different valid hostnames: the HOST's
+        # Docker daemon (Jenkins push, "localhost" — works, sees connection
+        # refused on anything else) and minikube's node (kubelet pull,
+        # "localhost" there means the node itself, not this host).
+        # 192.168.49.1 is minikube's docker-network gateway AND one of this
+        # host's own real interface IPs, so it's reachable from both
+        # without needing a daemon.json change on either side (confirmed
+        # live: minikube ssh -> getent hosts host.minikube.internal
+        # resolves to this same IP).
+        registry['token_realm'] = 'http://192.168.49.1:8929'
         gitlab_rails['gitlab_shell_ssh_port'] = 2224
         # Single-container local dev box — trim the heavier default
         # components nobody needs here (Prometheus monitoring stack,

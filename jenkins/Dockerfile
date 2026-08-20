@@ -23,9 +23,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # kustomize — the Jenkinsfile's manifest-bump stage uses
 # `kustomize edit set image` to point k8s/kustomization.yaml at the
 # just-pushed, commit-SHA-tagged images.
-RUN curl -fsSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.5.0/kustomize_v5.5.0_linux_amd64.tar.gz" \
+# set -o pipefail matters here: without it, a curl failure mid-stream
+# (this host's network is intermittently flaky — see the IPv6 comment
+# above) leaves tar operating on a truncated/empty stream, which can exit
+# 0 having extracted nothing — silently passing the RUN step with no
+# kustomize binary present at all (confirmed live: happened on a prior
+# build with no error, only caught later at pipeline runtime).
+RUN set -o pipefail && \
+    curl -fsSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.5.0/kustomize_v5.5.0_linux_amd64.tar.gz" \
       | tar -xz -C /usr/local/bin kustomize \
-    && chmod +x /usr/local/bin/kustomize
+    && chmod +x /usr/local/bin/kustomize \
+    && /usr/local/bin/kustomize version
 
 USER jenkins
 
