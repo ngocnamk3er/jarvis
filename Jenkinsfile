@@ -19,10 +19,20 @@ pipeline {
 
     stage('Frontend lint & build') {
       steps {
+        // Jenkins' own agent has no Node toolchain (deliberately — only
+        // Docker/git/kustomize, see jenkins/Dockerfile); run this in the
+        // same node image frontend/Dockerfile itself builds from. This is
+        // Docker-outside-of-Docker (Jenkins talks to the *host's* daemon
+        // via the mounted socket) — docker-workflow's .inside() handles
+        // the workspace volume sharing via --volumes-from automatically.
         dir('frontend') {
-          sh 'npm ci'
-          sh 'npm run lint'
-          sh 'npm run build'
+          script {
+            docker.image('node:22-alpine').inside {
+              sh 'npm ci'
+              sh 'npm run lint'
+              sh 'npm run build'
+            }
+          }
         }
       }
     }
