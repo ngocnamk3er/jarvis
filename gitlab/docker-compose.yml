@@ -1,0 +1,49 @@
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:17.5.2-ce.0
+    hostname: localhost
+    restart: unless-stopped
+    shm_size: "256m"
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://localhost:8929'
+        registry_external_url 'http://localhost:5050'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2224
+        # Single-container local dev box — trim the heavier default
+        # components nobody needs here (Prometheus monitoring stack,
+        # object storage backend beyond local disk).
+        prometheus_monitoring['enable'] = false
+        gitlab_rails['registry_enabled'] = true
+    ports:
+      - "8929:8929"
+      - "2224:22"
+      - "5050:5050"
+    volumes:
+      - gitlab_config:/etc/gitlab
+      - gitlab_logs:/var/log/gitlab
+      - gitlab_data:/var/opt/gitlab
+    networks:
+      - default
+      # Shared with jenkins/docker-compose.yml — lets GitLab's webhook
+      # reach Jenkins by container name (localhost inside one compose
+      # project's container doesn't resolve to a sibling project's
+      # container).
+      - citools
+    healthcheck:
+      # nginx listens on whatever port is in external_url (8929 here), not
+      # the default 80 — confirmed live via
+      # /var/opt/gitlab/nginx/conf/gitlab-http.conf's "listen *:8929;".
+      test: ["CMD", "curl", "-f", "http://localhost:8929/-/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 5m
+
+volumes:
+  gitlab_config:
+  gitlab_logs:
+  gitlab_data:
+
+networks:
+  citools:
+    external: true
