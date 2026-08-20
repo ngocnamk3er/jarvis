@@ -177,6 +177,10 @@ export function ToolGroupBadge({
   const [open, setOpen] = useState(!autoCollapsed)
 
   useEffect(() => {
+    // Synchronizes with the autoCollapsed prop flipping (e.g. once a tool
+    // finishes) — not a value derivable during render, since the user can
+    // still manually re-expand afterward via setOpen above.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (autoCollapsed) setOpen(false)
   }, [autoCollapsed])
 
@@ -253,6 +257,10 @@ export function ToolBadge({
   const label = tool.label || metaLabel
 
   useEffect(() => {
+    // Synchronizes with the autoCollapsed prop flipping (e.g. once a tool
+    // finishes) — not a value derivable during render, since the user can
+    // still manually re-expand afterward via setOpen above.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (autoCollapsed) setOpen(false)
   }, [autoCollapsed])
 

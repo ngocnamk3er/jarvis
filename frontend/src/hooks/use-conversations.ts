@@ -74,6 +74,9 @@ export function useConversations() {
   }, [])
 
   useEffect(() => {
+    // Fetches from the backend once auth resolves — synchronizing with an
+    // external system (the network), not a value derivable during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (status === "authenticated") fetch_()
   }, [status, fetch_])
 

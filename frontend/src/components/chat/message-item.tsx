@@ -160,6 +160,9 @@ function ThinkingBlock({ content, isStreaming }: { content: string; isStreaming?
   const [isOpen, setIsOpen] = useState(true)
 
   useEffect(() => {
+    // Auto-collapse once streaming ends — synchronizing with the external
+    // SSE stream state, not a value derivable during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!isStreaming) setIsOpen(false)
   }, [isStreaming])
 

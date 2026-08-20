@@ -54,6 +54,9 @@ export function ChatWindow() {
   useEffect(() => {
     const cid = searchParams.get("c")
     if (cid) {
+      // One-time restore from the URL on mount, not a value derivable
+      // during render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveId(cid)
       openConversation(cid)
     }
@@ -124,13 +127,18 @@ export function ChatWindow() {
   // or a clarify answer must carry it forward explicitly, since the backend
   // has no other way to know which model to continue with (see
   // chat_service.resume/resume_clarify).
+  // Reads a ref during render (flagged by react-hooks/refs) — intentional,
+  // see the lastSentModel/lastSentSubagentModel comment above for why this
+  // can't wait on state instead.
   const resumeModelId =
+    // eslint-disable-next-line react-hooks/refs
     (activeId && lastSentModel.current.get(activeId)) ??
     conversations.find((c) => c.id === activeId)?.last_model ??
     null
   const resumeModel = models.find((m) => m.id === resumeModelId)
 
   const resumeSubagentModelId =
+    // eslint-disable-next-line react-hooks/refs
     (activeId && lastSentSubagentModel.current.get(activeId)) ??
     conversations.find((c) => c.id === activeId)?.last_subagent_model ??
     null
@@ -207,11 +215,14 @@ export function ChatWindow() {
             isLoading={isLoading}
             onStop={stopMessage}
             initialModelId={
+              // Same ref-during-render tradeoff as resumeModelId above.
+              // eslint-disable-next-line react-hooks/refs
               (activeId && lastSentModel.current.get(activeId)) ??
               conversations.find((c) => c.id === activeId)?.last_model ??
               null
             }
             initialSubagentModelId={
+              // eslint-disable-next-line react-hooks/refs
               (activeId && lastSentSubagentModel.current.get(activeId)) ??
               conversations.find((c) => c.id === activeId)?.last_subagent_model ??
               null

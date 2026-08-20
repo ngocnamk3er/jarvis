@@ -106,6 +106,10 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, initialModelId,
   useEffect(() => {
     if (!model && models.length > 0) {
       const remembered = initialModelId ? models.find((m) => m.id === initialModelId) : undefined
+      // Intentional one-time default once the async model list arrives —
+      // not a derived-during-render value, since it must not re-fire once
+      // the user has picked a model.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setModel(remembered ?? models.find((m) => m.default) ?? models[0])
     }
   }, [models, model, initialModelId])
@@ -118,6 +122,9 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, initialModelId,
     if (!subagentModelInitialized.current && initialSubagentModelId && models.length > 0) {
       const remembered = models.find((m) => m.id === initialSubagentModelId)
       if (remembered) {
+        // One-time restore of a remembered subagent model, guarded by the
+        // ref above so it never re-fires after the user changes it.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSubagentModel(remembered)
         subagentModelInitialized.current = true
       }
@@ -134,6 +141,10 @@ export function ChatInput({ onSend, disabled, isLoading, onStop, initialModelId,
   useEffect(() => {
     if (!model) return
     if (model.effortOptions.includes(effort)) return
+    // Snapping to a valid effort level after a model switch — the effect
+    // itself IS the synchronization point (model changed -> re-validate
+    // effort), not a value derivable during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEffort(model.effortOptions.includes("high") ? "high" : model.effortOptions[0])
   }, [model, effort])
 
