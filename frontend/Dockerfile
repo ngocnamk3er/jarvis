@@ -1,5 +1,9 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
+# This host's IPv6 path is broken (see backend/Dockerfile for the glibc
+# equivalent) — node:22-alpine is musl-based, so /etc/gai.conf doesn't
+# apply here; Node's own --dns-result-order flag is the right knob.
+ENV NODE_OPTIONS=--dns-result-order=ipv4first
 COPY package.json package-lock.json ./
 RUN npm ci
 
