@@ -3,11 +3,12 @@
 import { useState, useCallback, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { apiFetch } from "@/lib/api-client"
-import { Message, MessagePart, StreamEvent, ThinkingEffort, ToolCall, Model, PendingClarify } from "@/types/chat"
+import { Message, MessagePart, StreamEvent, ThinkingEffort, ToolCall, Model, PendingHitl, PendingClarify } from "@/types/chat"
 
 // ── Module-level per-thread storage (persists across conversation switches) ──
 const _msgs = new Map<string, Message[]>()
 const _loading = new Map<string, boolean>()
+const _hitl = new Map<string, PendingHitl | null>()
 const _clarify = new Map<string, PendingClarify | null>()
 const _interrupted = new Map<string, boolean>()
 // Set when the user explicitly clicked Stop (as opposed to _interrupted,
@@ -228,6 +229,11 @@ async function runStream(body: ReadableStream<Uint8Array>, threadId: string, tar
           _notify(threadId)
           break
 
+        case "hitl_request":
+          _hitl.set(threadId, { actions: event.actions, review_configs: event.review_configs })
+          _notify(threadId)
+          break
+
         case "clarify_request":
           _clarify.set(threadId, { question: event.question, options: event.options })
           _notify(threadId)
@@ -268,6 +274,7 @@ export function useChat(threadId: string | null) {
 
   const messages = threadId ? (_msgs.get(threadId) ?? []) : []
   const isLoading = threadId ? (_loading.get(threadId) ?? false) : false
+  const pendingHitl = threadId ? (_hitl.get(threadId) ?? null) : null
   const pendingClarify = threadId ? (_clarify.get(threadId) ?? null) : null
   const interrupted = threadId ? (_interrupted.get(threadId) ?? false) : false
   const stopped = threadId ? (_stopped.get(threadId) ?? false) : false
@@ -306,6 +313,7 @@ export function useChat(threadId: string | null) {
   const sendMessage = useCallback(
     async (content: string, thinking_effort: ThinkingEffort = "high", model?: Model, subagentModel?: Model) => {
       if (!threadId) return
+      _hitl.set(threadId, null)
       _clarify.set(threadId, null)
       _interrupted.set(threadId, false)
       _stopped.set(threadId, false)
@@ -340,6 +348,59 @@ export function useChat(threadId: string | null) {
     [threadId, accessToken, _doStream]
   )
 
+  const resumeMessage = useCallback(
+    async (decision: "approve" | "reject", model?: Model, subagentModel?: Model) => {
+      if (!threadId) return
+      const msgs = _msgs.get(threadId) ?? []
+      let resumeId = ""
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === "assistant") { resumeId = msgs[i].id; break }
+      }
+      if (!resumeId) return
+
+      _hitl.set(threadId, null)
+      _clarify.set(threadId, null)
+      _stopped.set(threadId, false)
+      _msgs.set(threadId, msgs.map(m => {
+        if (m.id !== resumeId) return m
+        // Resuming re-executes the interrupted tool call from scratch with a
+        // fresh run_id (LangGraph replays the whole node, not just what's left
+        // of it) — so its original tool_start will never get a matching
+        // tool_end from this new stream. Resolve any still-running/streaming
+        // badges now so they don't spin forever; the resume stream then adds
+        // its own fresh badge for the retried call.
+        const parts = m.parts.map(p =>
+          p.type === "tool" && p.tool.status !== "done"
+            ? { ...p, tool: { ...p.tool, status: "done" as const } }
+            : p
+        )
+        return { ...m, parts, isStreaming: true }
+      }))
+      _notify(threadId)
+
+      const res = await apiFetch("/api/v1/chat/resume", accessToken, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          thread_id: threadId,
+          decision,
+          model: model?.id,
+          subagent_model: subagentModel?.id,
+        }),
+      }).catch(() => null)
+
+      if (!res?.body) {
+        _msgs.set(threadId, (_msgs.get(threadId) ?? []).map(m =>
+          m.id === resumeId ? { ...m, parts: [...m.parts, { type: "text" as const, content: "Failed to resume." }], isStreaming: false } : m
+        ))
+        _notify(threadId)
+        return
+      }
+      await _doStream(res.body, threadId, resumeId)
+    },
+    [threadId, accessToken, _doStream]
+  )
+
   const resumeClarify = useCallback(
     async (answer: string, model?: Model, subagentModel?: Model) => {
       if (!threadId) return
@@ -351,10 +412,11 @@ export function useChat(threadId: string | null) {
       if (!resumeId) return
 
       _clarify.set(threadId, null)
+      _hitl.set(threadId, null)
       _stopped.set(threadId, false)
       _msgs.set(threadId, msgs.map(m => {
         if (m.id !== resumeId) return m
-        // Resuming replays the interrupted
+        // Same reasoning as resumeMessage: resuming replays the interrupted
         // ask_user call from scratch with a fresh run_id, so its tool_start
         // (already suppressed as a badge, but tracked internally) will never
         // get a matching tool_end from this new stream.
@@ -403,7 +465,7 @@ export function useChat(threadId: string | null) {
     }).catch(() => {})
   }, [threadId, accessToken])
 
-  return { messages, isLoading, pendingClarify, interrupted, stopped, contextTokens, sendMessage, resumeClarify, stopMessage, loadHistory }
+  return { messages, isLoading, pendingHitl, pendingClarify, interrupted, stopped, contextTokens, sendMessage, resumeMessage, resumeClarify, stopMessage, loadHistory }
 }
 
 // ── Sidebar loading hook ───────────────────────────────────────────────────────

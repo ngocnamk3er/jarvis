@@ -11,6 +11,7 @@ import { EmptyState } from "./empty-state"
 import { MessageList } from "./message-list"
 import { ChatInput } from "./chat-input"
 import { ClarifyRequest } from "./clarify-request"
+import { HitlApproval } from "./hitl-approval"
 
 // Module-level set to track which threads have already had history loaded
 // (avoids re-fetching when switching back to a conversation mid-stream)
@@ -39,7 +40,7 @@ export function ChatWindow() {
   const lastSentModel = useRef<Map<string, string>>(new Map())
   const lastSentSubagentModel = useRef<Map<string, string>>(new Map())
 
-  const { messages, isLoading, pendingClarify, interrupted, stopped, contextTokens, sendMessage, resumeClarify, stopMessage, loadHistory } = useChat(activeId)
+  const { messages, isLoading, pendingHitl, pendingClarify, interrupted, stopped, contextTokens, sendMessage, resumeMessage, resumeClarify, stopMessage, loadHistory } = useChat(activeId)
   const loadingThreadIds = useLoadingThreadIds()
 
   async function openConversation(id: string) {
@@ -119,9 +120,10 @@ export function ChatWindow() {
     }
   }
 
-  // Same model this conversation is already using — resuming a clarify
-  // answer must carry it forward explicitly, since the backend has no other
-  // way to know which model to continue with (see chat_service.resume_clarify).
+  // Same model this conversation is already using — resuming a bash approval
+  // or a clarify answer must carry it forward explicitly, since the backend
+  // has no other way to know which model to continue with (see
+  // chat_service.resume/resume_clarify).
   const resumeModelId =
     (activeId && lastSentModel.current.get(activeId)) ??
     conversations.find((c) => c.id === activeId)?.last_model ??
@@ -168,6 +170,14 @@ export function ChatWindow() {
             <EmptyState />
           )}
 
+          {pendingHitl && !isLoading && (
+            <HitlApproval
+              hitl={pendingHitl}
+              onApprove={() => resumeMessage("approve", resumeModel, resumeSubagentModel)}
+              onReject={() => resumeMessage("reject", resumeModel, resumeSubagentModel)}
+            />
+          )}
+
           {pendingClarify && !isLoading && (
             <ClarifyRequest
               clarify={pendingClarify}
@@ -175,7 +185,7 @@ export function ChatWindow() {
             />
           )}
 
-          {(interrupted || stopped) && !isLoading && !pendingClarify && (
+          {(interrupted || stopped) && !isLoading && !pendingHitl && !pendingClarify && (
             <div className="flex justify-center pb-2">
               <div className="flex items-center gap-2.5 bg-white border border-amber-200 text-amber-700 rounded-full px-4 py-2 text-[12px] shadow-sm">
                 <span>{stopped ? "Stopped" : "Response was interrupted"}</span>
@@ -193,7 +203,7 @@ export function ChatWindow() {
           <ChatInput
             key={activeId}
             onSend={handleSend}
-            disabled={isLoading || !!pendingClarify}
+            disabled={isLoading || !!pendingHitl || !!pendingClarify}
             isLoading={isLoading}
             onStop={stopMessage}
             initialModelId={

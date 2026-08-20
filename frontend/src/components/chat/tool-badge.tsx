@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import {
   ChevronDown, ChevronRight, Download, Loader2,
-  Globe, Wrench, Layers, Bot,
+  Terminal, Globe, Wrench, Layers, Bot,
 } from "lucide-react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism"
@@ -16,6 +16,7 @@ import type { LucideIcon } from "lucide-react"
 type ToolMeta = { label: string; Icon: LucideIcon }
 
 const TOOL_META: Record<string, ToolMeta> = {
+  bash:             { label: "Running command",    Icon: Terminal  },
   web_search:       { label: "Searching the web",  Icon: Globe     },
   web_fetch:        { label: "Fetching page",       Icon: Globe     },
   task:             { label: "Delegating to sub-agent", Icon: Bot   },

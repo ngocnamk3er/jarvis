@@ -96,6 +96,10 @@ export type PendingClarify = {
   options?: string[] | null
 }
 
+export type HitlAction = { name: string; args: Record<string, unknown>; description: string }
+export type HitlReviewConfig = { action_name: string; allowed_decisions: string[] }
+export type PendingHitl = { actions: HitlAction[]; review_configs: HitlReviewConfig[] }
+
 export type StreamEvent =
   | { type: "token"; content: string }
   | { type: "thinking_token"; content: string }
@@ -113,6 +117,7 @@ export type StreamEvent =
       blocked: number
       task_run_id?: string
     }
+  | { type: "hitl_request"; actions: HitlAction[]; review_configs: HitlReviewConfig[] }
   | { type: "clarify_request"; question: string; options?: string[] | null }
   | ({ type: "usage" } & TokenUsage)
   | { type: "context_tokens"; tokens: number }
